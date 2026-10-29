@@ -77,6 +77,15 @@ function formatPrice(value) {
   return value === null || value === undefined ? '–' : `${Number(value).toFixed(2)} €`
 }
 
+function formatPriceDate(value) {
+  if (!value) return ''
+  // pokemontcg.io liefert das Datum als "YYYY/MM/DD".
+  const parts = value.split('/')
+  if (parts.length !== 3) return ''
+  const [y, m, d] = parts
+  return `Stand: ${d}.${m}.${y}`
+}
+
 async function load() {
   loading.value = true
   error.value = ''
@@ -153,7 +162,13 @@ function tilesForSet(setId) {
     const instances = ownedByNumber[oc.number]
     if (instances?.length) {
       for (const instance of instances) {
-        tiles.push({ kind: 'owned', price_eur: oc.price_eur, image_large: oc.image_large, ...instance })
+        tiles.push({
+          kind: 'owned',
+          price_eur: oc.price_eur,
+          price_updated_at: oc.price_updated_at,
+          image_large: oc.image_large,
+          ...instance,
+        })
       }
     } else {
       tiles.push({ kind: 'missing', ...oc })
@@ -357,7 +372,10 @@ watch(() => props.storageType, load)
             <div class="card-tile-info">
               <strong>{{ card.name }}</strong>
               <span>#{{ card.number }} · {{ card.set?.name }}</span>
-              <span class="card-tile-price">{{ formatPrice(card.price_eur) }}</span>
+              <span class="card-tile-price">
+                {{ formatPrice(card.price_eur) }}
+                <span v-if="card.price_updated_at" class="card-tile-price-date">{{ formatPriceDate(card.price_updated_at) }}</span>
+              </span>
               <div class="card-tile-actions">
                 <button class="btn btn-accent btn-sm" @click="openAddModalFromSearch(card)">+ Hinzufügen</button>
                 <button
@@ -428,7 +446,10 @@ watch(() => props.storageType, load)
                   #{{ tile.kind === 'owned' ? tile.card_number : tile.number }}
                   <template v-if="tile.kind === 'owned'"> · {{ tile.language }}</template>
                 </span>
-                <span class="card-tile-price">{{ formatPrice(tile.price_eur) }}</span>
+                <span class="card-tile-price">
+                  {{ formatPrice(tile.price_eur) }}
+                  <span v-if="tile.price_updated_at" class="card-tile-price-date">{{ formatPriceDate(tile.price_updated_at) }}</span>
+                </span>
 
                 <template v-if="tile.kind === 'owned'">
                   <div class="card-tile-badges">
@@ -535,6 +556,13 @@ watch(() => props.storageType, load)
 .card-tile-price {
   font-weight: 700;
   color: var(--poke-blue);
+}
+
+.card-tile-price-date {
+  display: block;
+  font-weight: 600;
+  font-size: 11px;
+  color: var(--poke-gray);
 }
 
 .set-filter-row {

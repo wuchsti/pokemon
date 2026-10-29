@@ -3,4 +3,4 @@
 // MINOR für jedes ausgelieferte Feature-/Fix-Paket. Bei jeder Änderung, die
 // live geht, hier hochzählen, damit Nutzer und Entwickler immer vom
 // gleichen Stand sprechen.
-export const APP_VERSION = '1.3'
+export const APP_VERSION = '1.4'

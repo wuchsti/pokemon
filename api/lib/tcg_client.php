@@ -99,17 +99,17 @@ function tcg_api_get(array $config, string $path, array $query = []): array
 }
 
 /**
- * Cache key for a set's card list. Versioned ("v2") because the cached
- * shape gained an image_large field after v1 rows were already live in
- * production - bumping the key avoids serving stale rows that silently
- * lack the new field (which broke "click to enlarge" for not-yet-owned
- * cards). Bump again whenever fetch_set_cards_live()'s returned shape
- * changes. Shared by tcg/set_cards.php and admin/warm_cache.php so both
- * read/write the exact same cache entries.
+ * Cache key for a set's card list. Versioned because the cached shape
+ * keeps gaining fields after older rows were already live in production
+ * (v2: image_large: v3: price_updated_at) - bumping the key avoids
+ * serving stale rows that silently lack a new field. Bump again whenever
+ * fetch_set_cards_live()'s returned shape changes. Shared by
+ * tcg/set_cards.php and admin/warm_cache.php so both read/write the
+ * exact same cache entries.
  */
 function set_cards_cache_key(string $setId): string
 {
-    return 'tcg_set_cards_v2_' . $setId;
+    return 'tcg_set_cards_v3_' . $setId;
 }
 
 /**
@@ -147,6 +147,7 @@ function fetch_set_cards_live(array $config, string $setId): array
                 'image_small' => $card['images']['small'] ?? '',
                 'image_large' => $card['images']['large'] ?? ($card['images']['small'] ?? ''),
                 'price_eur' => extract_cardmarket_price($card),
+                'price_updated_at' => extract_cardmarket_updated_at($card),
             ];
         }
 
@@ -192,4 +193,18 @@ function extract_cardmarket_price(array $card): ?float
     }
 
     return null;
+}
+
+/**
+ * Datum, an dem die Pokémon TCG API ihren Cardmarket-Preis-Schnappschuss
+ * für diese Karte zuletzt aktualisiert hat (nicht der heutige Tag - die
+ * API fragt Cardmarket nicht live ab, sondern pflegt einen periodisch
+ * aktualisierten Snapshot, der gerade bei Karten mit vielen Reprints
+ * spürbar veraltet sein kann). Wird in der UI angezeigt, damit ein alter
+ * Preis nicht mit einem aktuellen verwechselt wird.
+ */
+function extract_cardmarket_updated_at(array $card): ?string
+{
+    $value = $card['cardmarket']['updatedAt'] ?? null;
+    return is_string($value) && $value !== '' ? $value : null;
 }
