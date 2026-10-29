@@ -59,4 +59,6 @@ export const api = {
   listWishlist: (params = {}) => request(`wishlist/list.php?${new URLSearchParams(params)}`),
   addWishlistItem: (payload) => request('wishlist/add.php', { method: 'POST', body: payload }),
   removeWishlistItem: (payload) => request('wishlist/remove.php', { method: 'DELETE', body: payload }),
+
+  scanCard: (imageDataUri) => request('scan/recognize.php', { method: 'POST', body: { image: imageDataUri } }),
 }

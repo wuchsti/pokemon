@@ -23,6 +23,7 @@ function logout() {
         <router-link to="/dashboard">Dashboard</router-link>
         <router-link to="/collection/vault">Vault</router-link>
         <router-link to="/collection/trade_binder">Tauschbinder</router-link>
+        <router-link to="/scan" class="navbar-scan">📷 Scannen</router-link>
         <router-link to="/search">Karten suchen</router-link>
         <router-link to="/wishlist">Wunschliste</router-link>
         <button class="btn btn-outline btn-sm" @click="logout">Abmelden</button>
@@ -90,5 +91,16 @@ function logout() {
 
 .navbar-links a.router-link-active {
   color: var(--poke-red);
+}
+
+.navbar-scan {
+  background: var(--poke-yellow);
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 2px solid var(--poke-ink);
+}
+
+.navbar-scan.router-link-active {
+  color: var(--poke-ink);
 }
 </style>

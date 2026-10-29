@@ -86,9 +86,9 @@ onMounted(load)
           <span class="stat-value">{{ formatEuro(stats?.totals?.trade_binder_value) }}</span>
           <span class="stat-label">Wert im Tausch-Binder ({{ tradeCount }} Karten)</span>
         </router-link>
-        <router-link to="/search" class="poke-panel stat-card stat-card-accent">
-          <span class="stat-value">+</span>
-          <span class="stat-label">Neue Karte hinzufügen</span>
+        <router-link to="/scan" class="poke-panel stat-card stat-card-accent">
+          <span class="stat-value">📷</span>
+          <span class="stat-label">Karte scannen</span>
         </router-link>
       </div>
 

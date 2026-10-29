@@ -46,6 +46,13 @@ return [
         'base_url' => env('TCG_API_BASE_URL', 'https://api.pokemontcg.io/v2'),
         'api_key' => env('TCG_API_KEY', ''),
     ],
+    'vision_api' => [
+        // OpenAI-compatible chat completions endpoint with vision input.
+        // Used for the Phase 3 camera scan / OCR feature.
+        'base_url' => env('VISION_API_BASE_URL', 'https://api.openai.com/v1'),
+        'api_key' => env('VISION_API_KEY', ''),
+        'model' => env('VISION_API_MODEL', 'gpt-4o-mini'),
+    ],
     'cors' => [
         'allowed_origin' => env('CORS_ALLOWED_ORIGIN', '*'),
     ],

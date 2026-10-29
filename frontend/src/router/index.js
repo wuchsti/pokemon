@@ -25,6 +25,12 @@ const routes = [
     meta: { requiresAuth: true },
   },
   {
+    path: '/scan',
+    name: 'scan',
+    component: () => import('../views/Scan.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
     path: '/wishlist',
     name: 'wishlist',
     component: () => import('../views/Wishlist.vue'),

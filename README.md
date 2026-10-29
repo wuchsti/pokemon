@@ -3,15 +3,16 @@
 Webanwendung zur Verwaltung, Bewertung und Foto-Erkennung von Pokémon-Sammelkarten.
 Gebaut für ein Netcup Webhosting-Paket (Plesk, PHP 8.x, MariaDB).
 
-Dieses Repository enthält aktuell **Phase 1 (MVP Core & Authentication)** und
-**Phase 2 (Wertermittlung, Preis-Historie & Profil-Dashboard)**:
+Dieses Repository enthält aktuell **Phase 1 (MVP Core & Authentication)**,
+**Phase 2 (Wertermittlung, Preis-Historie & Profil-Dashboard)** und
+**Phase 3 (Foto-Erkennung / Scanning)**:
 Benutzer-Registrierung/Login, Pokémon-TCG-Kartensuche, die Verwaltung der
 eigenen Sammlung (Vault) und des Tausch-Binders inkl. Zustand, Sprache und
 Grading, ein täglicher Cardmarket-Preis-Sync, ein Dashboard mit Gesamtwert
 (getrennt nach Vault/Tauschbinder), Top-5-Schätzen, einem Wertverlaufs-Chart
-und Tagesgewinnern/-verlierern, sowie eine Wunschlisten-Funktion für fehlende
-Karten. Phasen 3–4 (Foto-Erkennung, Social Features & Export) folgen als
-nächste Ausbaustufen.
+und Tagesgewinnern/-verlierern, eine Wunschlisten-Funktion für fehlende
+Karten, sowie ein Kamera-/Foto-Scan-Flow zur schnellen Karten-Erfassung per
+Vision-API. Phase 4 (Social Features & Export) folgt als nächste Ausbaustufe.
 
 ## Architektur
 
@@ -32,18 +33,20 @@ nächste Ausbaustufen.
 api/
   config.php         # Zentrale Konfiguration (liest ENV / .env)
   lib/                # jwt.php, db.php, response.php, auth_middleware.php,
-                      # tcg_client.php, price_stats.php
+                      # tcg_client.php, price_stats.php, vision_client.php
   auth/               # register.php, login.php, me.php
   cards/              # list.php, add.php, update.php, delete.php (user_cards CRUD)
   tcg/                # search.php, sets.php, set_cards.php (Proxy zu pokemontcg.io)
   stats/              # dashboard.php (Gesamtwert, Top 5, Verlauf, Tagesgewinner/-verlierer)
   wishlist/           # list.php, add.php, remove.php
+  scan/               # recognize.php (Vision-API-OCR + Auto-Match)
 database/
   schema.sql          # users, user_cards, price_history, wishlist_items
 frontend/
   src/
-    views/            # Login, Register, Dashboard, Collection, CardSearch, Wishlist
-    components/       # Navbar, PokeballLoader, SetProgress, CardModal, ValueChart
+    views/            # Login, Register, Dashboard, Collection, CardSearch, Wishlist, Scan
+    components/       # Navbar, PokeballLoader, SetProgress, CardModal, ValueChart, CardScanner
+    utils/image.js     # Foto-Resize/Komprimierung (Kamera + Upload) vor dem Hochladen
     stores/auth.js     # Pinia Auth-Store
     api/client.js      # Fetch-Wrapper für /api/*
 cron/
@@ -121,8 +124,53 @@ rotierender Pokéball als Lade-Animation. Siehe `frontend/src/style.css`.
   Karten per Klick zur Wunschliste hinzufügen (`api/wishlist/*`, Tabelle
   `wishlist_items`), einsehbar unter `/wishlist`.
 
-## Nächste Schritte (Phase 3–4)
+## Phase 3 im Detail
 
-- Kamera-/Foto-Erkennung (OCR) zum Schnell-Erfassen von Karten.
+- **Kamera & Upload**: `/scan` (CardScanner.vue) nutzt `getUserMedia` für eine
+  Live-Kamera-Vorschau (Rückkamera bevorzugt) mit Foto-Aufnahme-Button, plus
+  einen Datei-Upload-Fallback für Geräte ohne Kamera-Zugriff oder ohne HTTPS
+  (Kamera-API erfordert einen sicheren Kontext). Fotos werden vor dem Upload
+  clientseitig auf max. 1024px / JPEG q=0.82 verkleinert (`utils/image.js`).
+- **Vision-API-OCR**: `api/scan/recognize.php` schickt das Foto an einen
+  konfigurierbaren, OpenAI-kompatiblen Vision-Endpunkt (`api/lib/vision_client.php`)
+  mit einem Prompt, der Kartenname, Kartennummer (z. B. "12" aus "12/135"),
+  Set-Gesamtzahl, Sprachvermutung und eine Konfidenz zurückgibt. Es wurde
+  bewusst eine Vision-API statt Tesseract.js gewählt, da kleine/glänzende
+  Kartennummern mit klassischer OCR erfahrungsgemäß deutlich schlechter
+  erkannt werden.
+- **Auto-Match & Fast-Add**: Mit den erkannten Feldern sucht das Backend
+  automatisch passende Karten über die Pokémon-TCG-API (gestaffelt:
+  Nummer+Name → nur Nummer → nur Name) und liefert bis zu 10 Kandidaten.
+  Die Vorschläge erscheinen als klickbare Kachel-Liste; ein Klick öffnet den
+  bestehenden Speichern-Dialog (CardModal: Ordner, Zustand, Sprache, Grading),
+  genau wie bei der manuellen Suche. Bei niedriger Konfidenz oder keinem
+  Treffer wird auf die manuelle Kartensuche verwiesen.
+- **Konfiguration**: `VISION_API_BASE_URL` / `VISION_API_KEY` / `VISION_API_MODEL`
+  in `.env` (Standard: OpenAI `gpt-4o-mini`, aber jeder OpenAI-kompatible
+  Chat-Completions-Endpunkt mit Bild-Input funktioniert).
+
+## Nächste Schritte (Phase 4)
+
 - Öffentliche Sammler-Profile, Tausch-Matchmaking (auch unter Einbeziehung der
   Wunschliste), CSV/PDF-Export.
+
+## Backlog (noch nicht terminiert)
+
+Vom Projektinhaber gewünscht, aber bewusst zurückgestellt bis nach den
+funktionalen Phasen 1–4:
+
+- **Startseite / Landingpage**: Eine öffentliche Seite vor dem Login, die auf
+  einen Blick zeigt, wofür PokéVault gedacht ist – mit Beispielbildern der
+  App (Dashboard, Scan-Flow, Sammlung) und einer klaren Mehrwert-Botschaft
+  ("Warum PokéVault?"). Aktuell landet jeder direkt auf `/login`.
+- **FAQ-Seite**: Häufige Fragen (Datenquelle der Preise, Unterstützung für
+  gegradete Karten, Datenschutz bei der Foto-Erkennung, etc.).
+- **Impressum**: in Deutschland für so eine Webanwendung Pflicht, sobald sie
+  nicht rein privat/unter Freunden betrieben wird (§5 TMG/DDG). Muss Anbieter-
+  Kontaktdaten enthalten.
+- **Datenschutzerklärung**: insbesondere relevant, weil die App Kamera-/
+  Fotodaten (Phase 3) an einen externen Vision-API-Anbieter sendet und
+  Nutzerkonten mit E-Mail-Adressen führt (DSGVO-Informationspflichten).
+
+Wenn es konkret losgehen soll: einfach sagen "bau jetzt die Startseite/FAQ/
+Impressum/Datenschutz" und ich lege los.
