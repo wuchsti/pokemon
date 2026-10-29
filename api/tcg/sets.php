@@ -36,7 +36,12 @@ $pdo = get_db($config);
 $data = tcg_cached_fetch(
     $pdo,
     $config,
-    'tcg_sets_all',
+    // v2: the cached value shape changed (now {sets: [...]} instead of the
+    // raw decoded API body) when set_cards.php/search.php got the same
+    // caching treatment - a different key avoids misreading an older,
+    // differently-shaped row still sitting in the DB from before this
+    // change as a (silently empty) "fresh" cache hit.
+    'tcg_sets_all_v2',
     SETS_CACHE_TTL_SECONDS,
     function () use ($config) {
         // Explicit pageSize: the upstream API's own default page size is
