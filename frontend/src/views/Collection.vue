@@ -123,6 +123,12 @@ const expandedSetIds = reactive(new Set())
 const setCardsCache = reactive({})
 const wishlistCache = reactive({})
 const loadingSetId = ref(null)
+// Fehler beim Laden einer einzelnen Sammlung (z.B. weil die externe API für
+// genau dieses Set gerade down ist) betreffen nur dieses eine Set - nicht
+// die ganze Seite. Daher eigener, pro-Set gescopeter Fehlerstatus statt des
+// globalen "error" oben auf der Seite (der sonst fälschlich wie ein
+// Totalausfall aussieht, obwohl nur eine von vielen Sammlungen betroffen ist).
+const setErrors = reactive({})
 
 async function toggleExpand(set) {
   if (expandedSetIds.has(set.id)) {
@@ -133,7 +139,7 @@ async function toggleExpand(set) {
   if (setCardsCache[set.id]) return
 
   loadingSetId.value = set.id
-  error.value = ''
+  delete setErrors[set.id]
   try {
     const [cardsResult, wishlistResult] = await Promise.all([
       api.getSetCards(set.id),
@@ -142,7 +148,7 @@ async function toggleExpand(set) {
     setCardsCache[set.id] = cardsResult.cards
     wishlistCache[set.id] = new Set(wishlistResult.items.map((i) => i.card_api_id))
   } catch (e) {
-    error.value = e.message
+    setErrors[set.id] = e.message
     expandedSetIds.delete(set.id)
   } finally {
     loadingSetId.value = null
@@ -429,6 +435,11 @@ watch(() => props.storageType, load)
           <span class="set-row-chevron">{{ expandedSetIds.has(set.id) ? '▲' : '▼' }}</span>
         </button>
 
+        <div v-if="setErrors[set.id]" class="set-row-error">
+          {{ setErrors[set.id] }}
+          <button type="button" class="btn btn-outline btn-sm" @click="toggleExpand(set)">🔄 Erneut versuchen</button>
+        </div>
+
         <div v-if="expandedSetIds.has(set.id)" class="set-row-body">
           <PokeballLoader v-if="loadingSetId === set.id" />
 
@@ -697,6 +708,19 @@ watch(() => props.storageType, load)
   border-top: 2px solid var(--poke-ink);
   padding: 16px;
   background: var(--poke-bg);
+}
+
+.set-row-error {
+  border-top: 2px solid var(--poke-ink);
+  padding: 12px 16px;
+  background: #fde8e8;
+  color: #9b1c1c;
+  font-weight: 600;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .card-grid {
