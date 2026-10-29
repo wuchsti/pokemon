@@ -99,6 +99,20 @@ function tcg_api_get(array $config, string $path, array $query = []): array
 }
 
 /**
+ * Cache key for a set's card list. Versioned ("v2") because the cached
+ * shape gained an image_large field after v1 rows were already live in
+ * production - bumping the key avoids serving stale rows that silently
+ * lack the new field (which broke "click to enlarge" for not-yet-owned
+ * cards). Bump again whenever fetch_set_cards_live()'s returned shape
+ * changes. Shared by tcg/set_cards.php and admin/warm_cache.php so both
+ * read/write the exact same cache entries.
+ */
+function set_cards_cache_key(string $setId): string
+{
+    return 'tcg_set_cards_v2_' . $setId;
+}
+
+/**
  * Live (uncached) fetch of every card in a set, trimmed to the fields the
  * UI needs plus the current Cardmarket EUR price. Paginates internally.
  * Shared by tcg/set_cards.php (per-set, cached) and the admin cache-warmer

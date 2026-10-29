@@ -34,7 +34,7 @@ $pdo = get_db($config);
 $data = tcg_cached_fetch(
     $pdo,
     $config,
-    'tcg_set_cards_' . $setId,
+    set_cards_cache_key($setId),
     SET_CARDS_CACHE_TTL_SECONDS,
     fn () => fetch_set_cards_live($config, $setId),
     "/cards?set.id=$setId"
