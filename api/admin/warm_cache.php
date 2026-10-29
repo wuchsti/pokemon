@@ -53,7 +53,7 @@ foreach ($allSets as $set) {
         continue;
     }
 
-    $cacheKey = 'tcg_set_cards_' . $setId;
+    $cacheKey = set_cards_cache_key($setId);
     if (cache_get($pdo, $cacheKey, CACHE_TTL_SECONDS) !== null) {
         $setsSkippedFresh++;
         continue;

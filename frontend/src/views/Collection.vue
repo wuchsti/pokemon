@@ -417,7 +417,7 @@ watch(() => props.storageType, load)
                 class="zoomable"
                 @click="
                   zoomImage(
-                    tile.kind === 'owned' ? (tile.image_large ?? tile.image_url) : tile.image_large,
+                    tile.kind === 'owned' ? (tile.image_large ?? tile.image_url) : (tile.image_large ?? tile.image_small),
                     tile.kind === 'owned' ? tile.card_name : tile.name
                   )
                 "
@@ -686,8 +686,8 @@ watch(() => props.storageType, load)
 }
 
 .zoom-image {
-  max-width: min(90vw, 480px);
-  max-height: 85vh;
+  max-width: min(94vw, 720px);
+  max-height: 92vh;
   border-radius: var(--radius-md);
   border: var(--border-comic);
   box-shadow: 6px 6px 0 rgba(0, 0, 0, 0.5);
