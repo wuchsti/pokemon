@@ -2,7 +2,10 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 
 const routes = [
-  { path: '/', redirect: '/dashboard' },
+  { path: '/', name: 'landing', component: () => import('../views/Landing.vue'), meta: { guestOnly: true } },
+  { path: '/faq', name: 'faq', component: () => import('../views/FAQ.vue') },
+  { path: '/impressum', name: 'impressum', component: () => import('../views/Impressum.vue') },
+  { path: '/datenschutz', name: 'datenschutz', component: () => import('../views/Datenschutz.vue') },
   { path: '/login', name: 'login', component: () => import('../views/Login.vue'), meta: { guestOnly: true } },
   { path: '/register', name: 'register', component: () => import('../views/Register.vue'), meta: { guestOnly: true } },
   {

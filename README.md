@@ -3,11 +3,12 @@
 Webanwendung zur Verwaltung, Bewertung und Foto-Erkennung von Pokémon-Sammelkarten.
 Gebaut für ein Netcup Webhosting-Paket (Plesk, PHP 8.x, MariaDB).
 
-Dieses Repository enthält aktuell alle vier funktionalen Phasen:
+Dieses Repository enthält alle vier funktionalen Phasen:
 **Phase 1 (MVP Core & Authentication)**,
 **Phase 2 (Wertermittlung, Preis-Historie & Profil-Dashboard)**,
 **Phase 3 (Foto-Erkennung / Scanning)** und
-**Phase 4 (Social Features & Export)**:
+**Phase 4 (Social Features & Export)**, sowie die öffentlichen Seiten
+(Startseite, FAQ, Impressum, Datenschutz):
 Benutzer-Registrierung/Login, Pokémon-TCG-Kartensuche, die Verwaltung der
 eigenen Sammlung (Vault) und des Tausch-Binders inkl. Zustand, Sprache und
 Grading, ein täglicher Cardmarket-Preis-Sync, ein Dashboard mit Gesamtwert
@@ -16,8 +17,12 @@ und Tagesgewinnern/-verlierern, eine Wunschlisten-Funktion für fehlende
 Karten, ein Kamera-/Foto-Scan-Flow zur schnellen Karten-Erfassung per
 Vision-API, ein öffentlicher Tausch-Binder-Link mit Tauschpartner-Matchmaking,
 ein Tausch-Chat mit beidseitiger Erfolgsbestätigung, sowie CSV- und
-Druck-/PDF-Export. Offen ist nur noch das in der README dokumentierte
-**Backlog** (Startseite, FAQ, Impressum, Datenschutz).
+Druck-/PDF-Export.
+
+⚠️ **Vor dem Live-Gang:** `Impressum.vue` und `Datenschutz.vue` sind
+strukturell vollständige, aber mit echten Platzhaltern (`[...]`) versehene
+Entwürfe - siehe [Öffentliche Seiten](#öffentliche-seiten-landing-faq-impressum-datenschutz)
+unten.
 
 ## Architektur
 
@@ -54,9 +59,10 @@ database/
   migrations/         # ALTER-Skripte für bereits bestehende Installationen
 frontend/
   src/
-    views/            # Login, Register, Dashboard, Collection, CardSearch, Wishlist,
-                      # Scan, Settings, Export, PrintExport, PublicBinder, Trades, TradeDetail
-    components/       # Navbar, PokeballLoader, SetProgress, CardModal, ValueChart, CardScanner
+    views/            # Landing, FAQ, Impressum, Datenschutz, Login, Register, Dashboard,
+                      # Collection, CardSearch, Wishlist, Scan, Settings, Export, PrintExport,
+                      # PublicBinder, Trades, TradeDetail
+    components/       # Navbar, Footer, PokeballLoader, SetProgress, CardModal, ValueChart, CardScanner
     utils/image.js     # Foto-Resize/Komprimierung (Kamera + Upload) vor dem Hochladen
     stores/auth.js     # Pinia Auth-Store
     api/client.js      # Fetch-Wrapper für /api/*
@@ -200,25 +206,25 @@ rotierender Pokéball als Lade-Animation. Siehe `frontend/src/style.css`.
     Druckfunktion ("Als PDF speichern") erzeugt das PDF, passend zum
     Composer-freien Hosting-Ansatz dieses Projekts.
 
-## Backlog (noch nicht terminiert)
+## Öffentliche Seiten (Landing, FAQ, Impressum, Datenschutz)
 
-Vom Projektinhaber gewünscht, aber bewusst zurückgestellt bis nach den
-funktionalen Phasen 1–4:
-
-- **Startseite / Landingpage**: Eine öffentliche Seite vor dem Login, die auf
-  einen Blick zeigt, wofür PokéVault gedacht ist – mit Beispielbildern der
-  App (Dashboard, Scan-Flow, Sammlung) und einer klaren Mehrwert-Botschaft
-  ("Warum PokéVault?"). Aktuell landet jeder direkt auf `/login`.
-- **FAQ-Seite**: Häufige Fragen (Datenquelle der Preise, Unterstützung für
-  gegradete Karten, Datenschutz bei der Foto-Erkennung, etc.).
-- **Impressum**: in Deutschland für so eine Webanwendung Pflicht, sobald sie
-  nicht rein privat/unter Freunden betrieben wird (§5 TMG/DDG). Muss Anbieter-
-  Kontaktdaten enthalten.
-- **Datenschutzerklärung**: insbesondere relevant, weil die App Kamera-/
-  Fotodaten (Phase 3) an einen externen Vision-API-Anbieter sendet,
-  Nutzerkonten mit E-Mail-Adressen führt, und seit Phase 4 Nutzer ihren
-  Tausch-Binder öffentlich zugänglich machen können (Opt-in, aber
-  dokumentationspflichtig) – DSGVO-Informationspflichten.
-
-Wenn es konkret losgehen soll: einfach sagen "bau jetzt die Startseite/FAQ/
-Impressum/Datenschutz" und ich lege los.
+- **Startseite** (`/`, `Landing.vue`): Hero mit Value-Proposition, vier
+  Feature-Kacheln ("Warum PokéVault?") und drei im echten Design nachgebaute
+  Vorschau-Panels (Dashboard-Ausschnitt, Scan-Flow, Tausch-Chat) statt echter
+  Screenshots - in dieser Umgebung lässt sich die App nicht gegen eine echte
+  Datenbank rendern, um Screenshots zu erzeugen. Für eingeloggte Nutzer leitet
+  `/` automatisch zu `/dashboard` weiter.
+- **FAQ** (`/faq`): Akkordeon mit Fragen zu Preisdaten, Grading, was mit
+  Scan-Fotos passiert, öffentlichem Tausch-Binder, Nickname-only beim Tauschen,
+  Bestätigung und Export.
+- **Impressum** (`/impressum`) & **Datenschutzerklärung** (`/datenschutz`):
+  Beide sind vollständige, aber mit `[Platzhaltern]` versehene Entwürfe,
+  deutlich mit einem Warn-Banner markiert. **Diese müssen vor dem Live-Gang**
+  mit den echten Anbieter-/Kontaktdaten ausgefüllt und von einer fachkundigen
+  Person geprüft werden - Claude kann hier keine rechtssichere Beratung
+  leisten, nur eine inhaltlich korrekte Struktur (welche Daten die App
+  technisch verarbeitet: Konto, Sammlung, Scan-Fotos via Vision-API,
+  öffentlicher Tausch-Binder, Tausch-Nachrichten).
+- **Footer** (`Footer.vue`, auf jeder Seite außer der Druckansicht): verlinkt
+  FAQ/Impressum/Datenschutz, damit sie nicht nur per direkter URL erreichbar
+  sind.

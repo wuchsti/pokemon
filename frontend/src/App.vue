@@ -2,6 +2,7 @@
 import { useRoute } from 'vue-router'
 import { useAuthStore } from './stores/auth'
 import Navbar from './components/Navbar.vue'
+import Footer from './components/Footer.vue'
 import PokeballLoader from './components/PokeballLoader.vue'
 
 const auth = useAuthStore()
@@ -15,6 +16,7 @@ const route = useRoute()
     <main :class="route.meta.hideNav ? 'print-content' : 'container main-content'">
       <router-view />
     </main>
+    <Footer v-if="!route.meta.hideNav" />
   </template>
 </template>
 
