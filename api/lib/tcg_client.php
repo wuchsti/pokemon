@@ -39,8 +39,25 @@ function tcg_api_request(array $config, string $path, array $query = []): array
     }
 
     $decoded = json_decode($responseBody, true);
+
+    if ($statusCode === 429) {
+        return [
+            'ok' => false,
+            'status' => 429,
+            'data' => is_array($decoded) ? $decoded : [],
+            'error' => 'Zu viele Anfragen an die Pokémon TCG API (Rate-Limit). '
+                . 'Ohne TCG_API_KEY in der .env ist das Limit sehr niedrig - '
+                . 'kostenlosen Key auf pokemontcg.io/developers holen und eintragen.',
+        ];
+    }
+
     if (!is_array($decoded)) {
-        return ['ok' => false, 'status' => 502, 'data' => [], 'error' => 'Ungültige JSON-Antwort.'];
+        return [
+            'ok' => false,
+            'status' => 502,
+            'data' => [],
+            'error' => "Ungültige Antwort der Pokémon TCG API (HTTP $statusCode).",
+        ];
     }
 
     if ($statusCode >= 400) {
@@ -48,7 +65,7 @@ function tcg_api_request(array $config, string $path, array $query = []): array
             'ok' => false,
             'status' => $statusCode,
             'data' => $decoded,
-            'error' => $decoded['error']['message'] ?? 'Fehler bei der Pokémon TCG API.',
+            'error' => $decoded['error']['message'] ?? "Fehler bei der Pokémon TCG API (HTTP $statusCode).",
         ];
     }
 
