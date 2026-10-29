@@ -76,6 +76,24 @@ const routes = [
     meta: { requiresAuth: true },
     props: true,
   },
+  {
+    path: '/admin',
+    name: 'admin-dashboard',
+    component: () => import('../views/AdminDashboard.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true },
+  },
+  {
+    path: '/admin/users',
+    name: 'admin-users',
+    component: () => import('../views/AdminUsers.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true },
+  },
+  {
+    path: '/admin/content',
+    name: 'admin-content',
+    component: () => import('../views/AdminContent.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true },
+  },
 ]
 
 const router = createRouter({
@@ -91,6 +109,10 @@ router.beforeEach(async (to) => {
 
   if (to.meta.requiresAuth && !auth.isAuthenticated) {
     return { name: 'login', query: { redirect: to.fullPath } }
+  }
+
+  if (to.meta.requiresAdmin && !auth.user?.is_admin) {
+    return { name: 'dashboard' }
   }
 
   if (to.meta.guestOnly && auth.isAuthenticated) {

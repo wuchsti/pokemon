@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { api } from '../api/client'
 import { useAuthStore } from '../stores/auth'
 import PokeballLoader from '../components/PokeballLoader.vue'
@@ -55,6 +55,51 @@ async function copyLink() {
   }
 }
 
+const emailForm = reactive({ new_email: '', current_password: '' })
+const emailSaving = ref(false)
+const emailError = ref('')
+const emailSuccess = ref('')
+
+async function changeEmail() {
+  emailSaving.value = true
+  emailError.value = ''
+  emailSuccess.value = ''
+  try {
+    const result = await api.changeEmail(emailForm)
+    user.value.email = result.email
+    if (auth.user) auth.user.email = result.email
+    emailSuccess.value = 'E-Mail-Adresse geändert ✓'
+    emailForm.new_email = ''
+    emailForm.current_password = ''
+  } catch (e) {
+    emailError.value = e.message
+  } finally {
+    emailSaving.value = false
+  }
+}
+
+const passwordForm = reactive({ current_password: '', new_password: '', new_password_confirm: '' })
+const passwordSaving = ref(false)
+const passwordError = ref('')
+const passwordSuccess = ref('')
+
+async function changePassword() {
+  passwordSaving.value = true
+  passwordError.value = ''
+  passwordSuccess.value = ''
+  try {
+    await api.changePassword(passwordForm)
+    passwordSuccess.value = 'Passwort geändert ✓'
+    passwordForm.current_password = ''
+    passwordForm.new_password = ''
+    passwordForm.new_password_confirm = ''
+  } catch (e) {
+    passwordError.value = e.message
+  } finally {
+    passwordSaving.value = false
+  }
+}
+
 onMounted(load)
 </script>
 
@@ -73,9 +118,55 @@ onMounted(load)
           <input :value="user.username" disabled />
         </div>
         <div class="field">
-          <label>E-Mail</label>
+          <label>Aktuelle E-Mail</label>
           <input :value="user.email" disabled />
         </div>
+      </section>
+
+      <section class="poke-panel settings-panel">
+        <h2 class="font-display panel-title">E-Mail-Adresse ändern</h2>
+
+        <div v-if="emailError" class="error-banner">{{ emailError }}</div>
+        <p v-if="emailSuccess" class="success-note">{{ emailSuccess }}</p>
+
+        <form @submit.prevent="changeEmail">
+          <div class="field">
+            <label>Neue E-Mail-Adresse</label>
+            <input v-model="emailForm.new_email" type="email" required autocomplete="email" />
+          </div>
+          <div class="field">
+            <label>Aktuelles Passwort (zur Bestätigung)</label>
+            <input v-model="emailForm.current_password" type="password" required autocomplete="current-password" />
+          </div>
+          <button class="btn btn-primary" :disabled="emailSaving" type="submit">
+            {{ emailSaving ? 'Speichert...' : 'E-Mail-Adresse ändern' }}
+          </button>
+        </form>
+      </section>
+
+      <section class="poke-panel settings-panel">
+        <h2 class="font-display panel-title">Passwort ändern</h2>
+
+        <div v-if="passwordError" class="error-banner">{{ passwordError }}</div>
+        <p v-if="passwordSuccess" class="success-note">{{ passwordSuccess }}</p>
+
+        <form @submit.prevent="changePassword">
+          <div class="field">
+            <label>Aktuelles Passwort</label>
+            <input v-model="passwordForm.current_password" type="password" required autocomplete="current-password" />
+          </div>
+          <div class="field">
+            <label>Neues Passwort (min. 8 Zeichen)</label>
+            <input v-model="passwordForm.new_password" type="password" required minlength="8" autocomplete="new-password" />
+          </div>
+          <div class="field">
+            <label>Neues Passwort bestätigen</label>
+            <input v-model="passwordForm.new_password_confirm" type="password" required minlength="8" autocomplete="new-password" />
+          </div>
+          <button class="btn btn-primary" :disabled="passwordSaving" type="submit">
+            {{ passwordSaving ? 'Speichert...' : 'Passwort ändern' }}
+          </button>
+        </form>
       </section>
 
       <section class="poke-panel settings-panel">
@@ -151,5 +242,10 @@ onMounted(load)
   min-width: 180px;
   font-size: 13px;
   word-break: break-all;
+}
+
+.success-note {
+  font-weight: 700;
+  color: #1d9a4a;
 }
 </style>

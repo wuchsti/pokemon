@@ -92,4 +92,16 @@ export const api = {
   sendTradeMessage: (payload) => request('trades/message.php', { method: 'POST', body: payload }),
   confirmTrade: (tradeId) => request('trades/confirm.php', { method: 'POST', body: { trade_id: tradeId } }),
   cancelTrade: (tradeId) => request('trades/cancel.php', { method: 'POST', body: { trade_id: tradeId } }),
+
+  changeEmail: (payload) => request('auth/change_email.php', { method: 'PUT', body: payload }),
+  changePassword: (payload) => request('auth/change_password.php', { method: 'PUT', body: payload }),
+
+  getContent: (key) => request(`content/get.php?${new URLSearchParams({ key })}`, { auth: false }),
+
+  adminListUsers: () => request('admin/users/list.php'),
+  adminBlockUser: (id) => request('admin/users/block.php', { method: 'POST', body: { id } }),
+  adminUnblockUser: (id) => request('admin/users/unblock.php', { method: 'POST', body: { id } }),
+  adminDeleteUser: (id) => request('admin/users/delete.php', { method: 'POST', body: { id } }),
+  adminStats: () => request('admin/stats.php'),
+  adminUpdateContent: (key, value) => request('admin/content/update.php', { method: 'POST', body: { key, value } }),
 }

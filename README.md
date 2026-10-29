@@ -16,12 +16,14 @@ Grading, ein täglicher Cardmarket-Preis-Sync, ein Dashboard mit Gesamtwert
 und Tagesgewinnern/-verlierern, eine Wunschlisten-Funktion für fehlende
 Karten, ein Kamera-/Foto-Scan-Flow zur schnellen Karten-Erfassung per
 Vision-API, ein öffentlicher Tausch-Binder-Link mit Tauschpartner-Matchmaking,
-ein Tausch-Chat mit beidseitiger Erfolgsbestätigung, sowie CSV- und
-Druck-/PDF-Export.
+ein Tausch-Chat mit beidseitiger Erfolgsbestätigung, CSV- und Druck-/PDF-Export,
+ein Admin-Bereich zur Nutzerverwaltung und Content-Pflege, sowie ein
+Profilbereich zum Ändern von E-Mail-Adresse und Passwort.
 
-⚠️ **Vor dem Live-Gang:** `Impressum.vue` und `Datenschutz.vue` sind
+⚠️ **Vor dem Live-Gang:** Impressum und Datenschutzerklärung sind
 strukturell vollständige, aber mit echten Platzhaltern (`[...]`) versehene
-Entwürfe - siehe [Öffentliche Seiten](#öffentliche-seiten-landing-faq-impressum-datenschutz)
+Entwürfe, die jetzt live im Admin-Bereich (`/admin/content`) bearbeitet
+werden - siehe [Öffentliche Seiten](#öffentliche-seiten-landing-faq-impressum-datenschutz)
 unten.
 
 ## Architektur
@@ -42,27 +44,32 @@ unten.
 ```
 api/
   config.php         # Zentrale Konfiguration (liest ENV / .env)
-  lib/                # jwt.php, db.php, response.php, auth_middleware.php,
+  lib/                # jwt.php, db.php, response.php, auth_middleware.php, admin.php,
                       # tcg_client.php, price_stats.php, vision_client.php
-  auth/               # register.php, login.php, me.php, settings.php
+  auth/               # register.php, login.php, me.php, settings.php,
+                      # change_email.php, change_password.php
   cards/              # list.php, add.php, update.php, delete.php (user_cards CRUD)
   tcg/                # search.php, sets.php, set_cards.php (Proxy zu pokemontcg.io)
   stats/              # dashboard.php (Gesamtwert, Top 5, Verlauf, Tagesgewinner/-verlierer)
   wishlist/           # list.php, add.php, remove.php
-  scan/               # recognize.php (Vision-API-OCR + Auto-Match)
+  scan/               # recognize.php (Vision-API-OCR + Auto-Match + Scan-Logging)
   public/             # binder.php (öffentlicher Tausch-Binder, keine Auth)
   matchmaking/        # find_traders.php (Wunschliste vs. öffentliche Tausch-Binder)
   export/             # cards.php (JSON), csv.php (CSV-Download)
   trades/             # create.php, list.php, get.php, message.php, confirm.php, cancel.php
+  content/            # get.php (öffentlich, liefert Impressum/Datenschutz-Text)
+  admin/              # stats.php, users/{list,block,unblock,delete}.php, content/update.php
 database/
-  schema.sql          # users, user_cards, price_history, wishlist_items, trades, trade_messages
-  migrations/         # ALTER-Skripte für bereits bestehende Installationen
+  schema.sql          # users, user_cards, price_history, wishlist_items, trades,
+                      # trade_messages, scan_log, site_content
+  migrations/         # ALTER-/CREATE-Skripte für bereits bestehende Installationen
 frontend/
   src/
     views/            # Landing, FAQ, Impressum, Datenschutz, Login, Register, Dashboard,
                       # Collection, CardSearch, Wishlist, Scan, Settings, Export, PrintExport,
-                      # PublicBinder, Trades, TradeDetail
-    components/       # Navbar, Footer, PokeballLoader, SetProgress, CardModal, ValueChart, CardScanner
+                      # PublicBinder, Trades, TradeDetail, AdminDashboard, AdminUsers, AdminContent
+    components/       # Navbar, Footer, PokeballLoader, SetProgress, CardModal, ValueChart,
+                      # CardScanner, LegalContent, AdminNav
     utils/image.js     # Foto-Resize/Komprimierung (Kamera + Upload) vor dem Hochladen
     stores/auth.js     # Pinia Auth-Store
     api/client.js      # Fetch-Wrapper für /api/*
@@ -101,8 +108,8 @@ Vite proxyt `/api/*`-Requests im Dev-Modus auf `http://localhost:8080`
 3. In Plesk: MariaDB-Datenbank anlegen, `database/schema.sql` importieren.
    Bei einer **bereits bestehenden** Installation zusätzlich die Dateien in
    `database/migrations/` in aufsteigender Reihenfolge einspielen (aktuell:
-   `001_add_public_binder_enabled.sql`) - `schema.sql` legt neue Spalten an
-   bestehenden Tabellen nicht nachträglich an.
+   `001_add_public_binder_enabled.sql`, `002_add_admin_and_content.sql`) -
+   `schema.sql` legt neue Spalten an bestehenden Tabellen nicht nachträglich an.
 4. In Plesk unter "PHP-Einstellungen" bzw. per `.env`-Datei neben `api/config.php`
    die Variablen aus `.env.example` setzen (insbesondere `JWT_SECRET` auf einen
    langen, zufälligen Wert ändern!).
@@ -117,6 +124,13 @@ Vite proxyt `/api/*`-Requests im Dev-Modus auf `http://localhost:8080`
    Das Skript fragt für jede in `user_cards` vorhandene Karte den aktuellen
    Cardmarket-Preis ab und schreibt einen Eintrag pro Tag in `price_history`.
    Mehrfaches Ausführen am selben Tag aktualisiert nur den heutigen Eintrag.
+7. **Ersten Admin bestimmen**: Es gibt keinen Einrichtungsassistenten dafür -
+   nach der Registrierung des ersten echten Accounts einmalig per SQL:
+   ```sql
+   UPDATE users SET is_admin = 1 WHERE username = 'DEIN_BENUTZERNAME';
+   ```
+   Danach ist `/admin` für diesen Account freigeschaltet und weitere Admins
+   lassen sich bei Bedarf genauso bestimmen.
 
 ## Design
 
@@ -206,6 +220,49 @@ rotierender Pokéball als Lade-Animation. Siehe `frontend/src/style.css`.
     Druckfunktion ("Als PDF speichern") erzeugt das PDF, passend zum
     Composer-freien Hosting-Ansatz dieses Projekts.
 
+## Admin-Bereich
+
+Sichtbar in der Navbar (🛠️ Admin) nur für Accounts mit `is_admin = 1` -
+siehe [Ersten Admin bestimmen](#deployment-auf-netcupplesk) beim Deployment.
+Jeder Admin-Endpunkt prüft serverseitig `api/lib/admin.php` (`require_admin_user_id`),
+die Navigation ist also kein Sicherheitsmechanismus, nur UI.
+
+- **Übersicht** (`/admin`, `api/admin/stats.php`): Nutzer gesamt/aktiv/gesperrt,
+  Karten gesamt (Vault/Tauschbinder), abgeschlossene/offene/abgebrochene Tausche,
+  gescannte Karten (inkl. automatisch zugeordneter), Wunschlisten-Einträge,
+  öffentliche Tausch-Binder. "Gescannte Karten" kommt aus einem neuen
+  `scan_log`-Eintrag pro Scan-Versuch (`api/scan/recognize.php`); "Tausche"
+  zählt Tausch-*Threads*, da Tausche in diesem Modell nicht einzelkartenweise
+  erfasst werden.
+- **Nutzer** (`/admin/users`, `api/admin/users/*.php`): Tabelle mit
+  Kartenanzahl, Tausch- und Scan-Zahlen pro Nutzer. Aktionen:
+  - **Sperren/Freischalten** (`is_blocked`): ein gesperrter Account kann sich
+    nicht mehr einloggen und wird auch bei einem noch gültigen Token sofort
+    abgemeldet (`auth_middleware.php` prüft `is_blocked` bei jedem
+    authentifizierten Request neu, nicht nur beim Login).
+  - **Löschen**: entfernt den Account vollständig; Karten, Wunschliste,
+    Tausche/Nachrichten und Scan-Log-Einträge löschen über die
+    `ON DELETE CASCADE`-Fremdschlüssel automatisch mit.
+  - Ein Admin kann sich selbst weder sperren noch über diese Seite löschen
+    (Aussperr-Schutz).
+- **Impressum & Datenschutz** (`/admin/content`, `api/admin/content/update.php`
+  + `api/content/get.php`): Die Texte liegen als einfacher Text in der Tabelle
+  `site_content` und werden über einen Textbereich bearbeitet (Konvention:
+  eine Zeile `## Titel` wird zur Überschrift, Leerzeile = neuer Absatz - siehe
+  `components/LegalContent.vue`). Die öffentlichen Seiten `/impressum` und
+  `/datenschutz` laden diesen Text live, Änderungen erscheinen sofort.
+
+## Profil (Einstellungen)
+
+Unter `/settings` kann jeder Nutzer neben dem öffentlichen Tausch-Binder-Link:
+
+- **E-Mail-Adresse ändern** (`api/auth/change_email.php`): erfordert das
+  aktuelle Passwort zur Bestätigung und prüft, dass die neue Adresse nicht
+  schon vergeben ist.
+- **Passwort ändern** (`api/auth/change_password.php`): erfordert ebenfalls
+  das aktuelle Passwort, verlangt die Eingabe des neuen Passworts zweimal
+  (Bestätigung) und mindestens 8 Zeichen.
+
 ## Öffentliche Seiten (Landing, FAQ, Impressum, Datenschutz)
 
 - **Startseite** (`/`, `Landing.vue`): Hero mit Value-Proposition, vier
@@ -218,9 +275,12 @@ rotierender Pokéball als Lade-Animation. Siehe `frontend/src/style.css`.
   Scan-Fotos passiert, öffentlichem Tausch-Binder, Nickname-only beim Tauschen,
   Bestätigung und Export.
 - **Impressum** (`/impressum`) & **Datenschutzerklärung** (`/datenschutz`):
-  Beide sind vollständige, aber mit `[Platzhaltern]` versehene Entwürfe,
-  deutlich mit einem Warn-Banner markiert. **Diese müssen vor dem Live-Gang**
-  mit den echten Anbieter-/Kontaktdaten ausgefüllt und von einer fachkundigen
+  laden ihren Text jetzt live aus `site_content` (siehe Admin-Bereich oben)
+  statt ihn im Code zu hartcodieren. Der mitgelieferte Startinhalt ist ein
+  vollständiger, aber mit `[Platzhaltern]` versehener Entwurf; der
+  entsprechende Warn-Hinweis dazu sitzt im Admin-Editor (`/admin/content`),
+  wo er tatsächlich wirkt. **Vor dem Live-Gang** müssen die echten
+  Anbieter-/Kontaktdaten eingetragen und die Texte von einer fachkundigen
   Person geprüft werden - Claude kann hier keine rechtssichere Beratung
   leisten, nur eine inhaltlich korrekte Struktur (welche Daten die App
   technisch verarbeitet: Konto, Sammlung, Scan-Fotos via Vision-API,

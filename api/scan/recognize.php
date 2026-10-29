@@ -8,6 +8,7 @@
 // can offer ready-to-pick candidates (the "Fast-Add" flow).
 
 require_once __DIR__ . '/../lib/response.php';
+require_once __DIR__ . '/../lib/db.php';
 require_once __DIR__ . '/../lib/auth_middleware.php';
 require_once __DIR__ . '/../lib/vision_client.php';
 require_once __DIR__ . '/../lib/tcg_client.php';
@@ -19,7 +20,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_error('Methode nicht erlaubt.', 405);
 }
 
-require_auth_user_id($config);
+$userId = require_auth_user_id($config);
 
 $body = read_json_body();
 $imageDataUri = (string) ($body['image'] ?? '');
@@ -40,6 +41,14 @@ if (!$recognition['ok']) {
 
 $extracted = $recognition['data'];
 $candidates = find_card_candidates($config, $extracted);
+
+$pdo = get_db($config);
+$pdo->prepare('INSERT INTO scan_log (user_id, card_name, matched) VALUES (:user_id, :card_name, :matched)')
+    ->execute([
+        'user_id' => $userId,
+        'card_name' => $extracted['card_name'] ?? null,
+        'matched' => $candidates !== [] ? 1 : 0,
+    ]);
 
 json_response([
     'extracted' => $extracted,

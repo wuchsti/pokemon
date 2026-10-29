@@ -32,6 +32,7 @@ function logout() {
         <router-link to="/trades">Tausche</router-link>
         <router-link to="/export">Export</router-link>
         <router-link to="/settings">Einstellungen</router-link>
+        <router-link v-if="auth.user?.is_admin" to="/admin" class="navbar-admin">🛠️ Admin</router-link>
         <button class="btn btn-outline btn-sm" @click="logout">Abmelden</button>
       </nav>
 
@@ -114,5 +115,12 @@ function logout() {
 
 .navbar-scan.router-link-active {
   color: var(--poke-ink);
+}
+
+.navbar-admin {
+  background: var(--poke-ink);
+  color: var(--poke-white) !important;
+  padding: 6px 12px;
+  border-radius: 999px;
 }
 </style>

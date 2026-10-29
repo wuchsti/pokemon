@@ -58,7 +58,7 @@ try {
 
     json_response([
         'token' => $token,
-        'user' => ['id' => $userId, 'username' => $username, 'email' => $email],
+        'user' => ['id' => $userId, 'username' => $username, 'email' => $email, 'is_admin' => false],
     ], 201);
 } catch (PDOException $e) {
     json_error('Registrierung fehlgeschlagen.', 500);

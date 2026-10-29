@@ -21,12 +21,19 @@ if ($identifier === '' || $password === '') {
 
 $pdo = get_db($config);
 
-$stmt = $pdo->prepare('SELECT id, username, email, password_hash FROM users WHERE username = :identifier OR email = :identifier LIMIT 1');
+$stmt = $pdo->prepare(
+    'SELECT id, username, email, password_hash, is_admin, is_blocked
+     FROM users WHERE username = :identifier OR email = :identifier LIMIT 1'
+);
 $stmt->execute(['identifier' => $identifier]);
 $user = $stmt->fetch();
 
 if (!$user || !password_verify($password, $user['password_hash'])) {
     json_error('Ungültige Anmeldedaten.', 401);
+}
+
+if ($user['is_blocked']) {
+    json_error('Dieser Account wurde gesperrt.', 403);
 }
 
 $token = jwt_encode(
@@ -37,5 +44,10 @@ $token = jwt_encode(
 
 json_response([
     'token' => $token,
-    'user' => ['id' => (int) $user['id'], 'username' => $user['username'], 'email' => $user['email']],
+    'user' => [
+        'id' => (int) $user['id'],
+        'username' => $user['username'],
+        'email' => $user['email'],
+        'is_admin' => (bool) $user['is_admin'],
+    ],
 ]);
