@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/response.php';
+require_once __DIR__ . '/error_log.php';
 
 /**
  * Performs a raw GET request against the Pokémon TCG API (api.pokemontcg.io).
@@ -76,13 +77,22 @@ function tcg_api_request(array $config, string $path, array $query = []): array
  * Same as tcg_api_request(), but ends the HTTP request with a proxied error
  * status on failure. Only use this from api/*.php endpoints, never from CLI
  * scripts (the cronjob should keep going after one card fails).
+ *
+ * The real, technical error (rate limits, upstream HTTP status, etc.) is
+ * logged for admins under /admin/logs rather than shown to the user - a
+ * regular user gets a short, friendly message instead and has no way to
+ * act on "HTTP 429" or similar details anyway.
  */
 function tcg_api_get(array $config, string $path, array $query = []): array
 {
     $result = tcg_api_request($config, $path, $query);
 
     if (!$result['ok']) {
-        json_error($result['error'] ?? 'Fehler bei der Pokémon TCG API.', $result['status']);
+        log_api_error($config, 'tcg_api', $result['error'] ?? 'Unbekannter Fehler', "$path (HTTP {$result['status']})");
+        json_error(
+            'Pokémon-Kartendaten sind gerade nicht erreichbar. Bitte versuch es in ein paar Minuten erneut.',
+            $result['status']
+        );
     }
 
     return $result['data'];
