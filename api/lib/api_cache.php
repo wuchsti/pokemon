@@ -6,6 +6,8 @@
 // die API gerade nicht erreichbar ist.
 
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/response.php';
+require_once __DIR__ . '/error_log.php';
 
 /**
  * Liefert den gecachten Wert zurück, wenn er noch frisch genug ist
@@ -63,4 +65,42 @@ function cache_set(PDO $pdo, string $key, array $value): void
          ON DUPLICATE KEY UPDATE cache_value = :value2'
     );
     $stmt->execute(['key' => $key, 'value' => $json, 'value2' => $json]);
+}
+
+/**
+ * Standard-Ablauf für jeden gecachten externen API-Abruf:
+ * 1. frischen Cache-Treffer zurückgeben, falls vorhanden
+ * 2. sonst live abrufen (über $fetch) und bei Erfolg cachen
+ * 3. bei Fehlschlag: Fehler loggen, veralteten Cache als Fallback probieren
+ * 4. sonst generische Fehlermeldung an den Client (beendet die Anfrage)
+ *
+ * $fetch muss array{ok: bool, status: int, data: array, error: ?string}
+ * liefern (wie tcg_api_request()). Bei Erfolg wird genau $result['data']
+ * gecacht und zurückgegeben.
+ */
+function tcg_cached_fetch(PDO $pdo, array $config, string $cacheKey, int $ttlSeconds, callable $fetch, string $errorContext): array
+{
+    $cached = cache_get($pdo, $cacheKey, $ttlSeconds);
+    if ($cached !== null) {
+        return $cached;
+    }
+
+    $result = $fetch();
+
+    if ($result['ok']) {
+        cache_set($pdo, $cacheKey, $result['data']);
+        return $result['data'];
+    }
+
+    log_api_error($config, 'tcg_api', $result['error'] ?? 'Unbekannter Fehler', $errorContext . ' (HTTP ' . $result['status'] . ')');
+
+    $stale = cache_get_stale($pdo, $cacheKey);
+    if ($stale !== null) {
+        return $stale;
+    }
+
+    json_error(
+        'Pokémon-Kartendaten sind gerade nicht erreichbar. Bitte versuch es in ein paar Minuten erneut.',
+        $result['status']
+    );
 }

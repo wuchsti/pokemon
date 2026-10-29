@@ -14,7 +14,6 @@ require_once __DIR__ . '/../lib/response.php';
 require_once __DIR__ . '/../lib/db.php';
 require_once __DIR__ . '/../lib/tcg_client.php';
 require_once __DIR__ . '/../lib/api_cache.php';
-require_once __DIR__ . '/../lib/error_log.php';
 
 $config = require __DIR__ . '/../config.php';
 send_cors_headers($config);
@@ -30,34 +29,31 @@ if ($setId !== '') {
     json_response(['set' => $result['data'] ?? null]);
 }
 
-const SETS_CACHE_KEY = 'tcg_sets_all';
 const SETS_CACHE_TTL_SECONDS = 86400; // 1 Tag
 
 $pdo = get_db($config);
 
-$cached = cache_get($pdo, SETS_CACHE_KEY, SETS_CACHE_TTL_SECONDS);
-if ($cached !== null) {
-    json_response(['sets' => $cached['data'] ?? []]);
-}
-
-// Explicit pageSize: the upstream API's own default page size is smaller
-// than the number of sets that exist, which would silently cut off older
-// sets from the "all collections" browser.
-$result = tcg_api_request($config, '/sets', ['orderBy' => '-releaseDate', 'pageSize' => 250]);
-
-if ($result['ok']) {
-    cache_set($pdo, SETS_CACHE_KEY, $result['data']);
-    json_response(['sets' => $result['data']['data'] ?? []]);
-}
-
-log_api_error($config, 'tcg_api', $result['error'] ?? 'Unbekannter Fehler', '/sets (HTTP ' . $result['status'] . ')');
-
-$stale = cache_get_stale($pdo, SETS_CACHE_KEY);
-if ($stale !== null) {
-    json_response(['sets' => $stale['data'] ?? []]);
-}
-
-json_error(
-    'Pokémon-Kartendaten sind gerade nicht erreichbar. Bitte versuch es in ein paar Minuten erneut.',
-    $result['status']
+$data = tcg_cached_fetch(
+    $pdo,
+    $config,
+    // v2: the cached value shape changed (now {sets: [...]} instead of the
+    // raw decoded API body) when set_cards.php/search.php got the same
+    // caching treatment - a different key avoids misreading an older,
+    // differently-shaped row still sitting in the DB from before this
+    // change as a (silently empty) "fresh" cache hit.
+    'tcg_sets_all_v2',
+    SETS_CACHE_TTL_SECONDS,
+    function () use ($config) {
+        // Explicit pageSize: the upstream API's own default page size is
+        // smaller than the number of sets that exist, which would silently
+        // cut off older sets from the "all collections" browser.
+        $result = tcg_api_request($config, '/sets', ['orderBy' => '-releaseDate', 'pageSize' => 250]);
+        if (!$result['ok']) {
+            return $result;
+        }
+        return ['ok' => true, 'status' => 200, 'data' => ['sets' => $result['data']['data'] ?? []], 'error' => null];
+    },
+    '/sets'
 );
+
+json_response(['sets' => $data['sets'] ?? []]);
