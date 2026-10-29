@@ -23,9 +23,9 @@ $pdo = get_db($config);
 
 $stmt = $pdo->prepare(
     'SELECT id, username, email, password_hash, is_admin, is_blocked
-     FROM users WHERE username = :identifier OR email = :identifier LIMIT 1'
+     FROM users WHERE username = :identifier OR email = :identifier2 LIMIT 1'
 );
-$stmt->execute(['identifier' => $identifier]);
+$stmt->execute(['identifier' => $identifier, 'identifier2' => $identifier]);
 $user = $stmt->fetch();
 
 if (!$user || !password_verify($password, $user['password_hash'])) {
