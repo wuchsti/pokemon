@@ -122,13 +122,17 @@ onMounted(load)
 
       <div v-if="warmResult" class="warm-cache-result">
         <p>
-          <strong>Sets:</strong>
+          <strong>Sets</strong> ({{ warmResult.sets.total }} insgesamt):
           {{ warmResult.sets.updated }} aktualisiert · {{ warmResult.sets.skipped_fresh }} bereits aktuell ·
           {{ warmResult.sets.failed }} fehlgeschlagen
           <template v-if="!warmDone"> · {{ warmResult.sets.remaining }} folgen im nächsten Durchlauf...</template>
         </p>
-        <p>
-          <strong>Preise:</strong>
+        <p v-if="warmResult.prices.total === 0">
+          <strong>Preise:</strong> keine Karten in der Datenbank erfasst (noch niemand hat eine Karte in
+          seine Sammlung gelegt) - es gibt aktuell nichts zu synchronisieren.
+        </p>
+        <p v-else>
+          <strong>Preise</strong> ({{ warmResult.prices.total }} Karten zu prüfen):
           {{ warmResult.prices.updated }} aktualisiert · {{ warmResult.prices.skipped }} ohne Cardmarket-Preis ·
           {{ warmResult.prices.failed }} fehlgeschlagen
           <template v-if="!warmDone"> · {{ warmResult.prices.remaining }} folgen im nächsten Durchlauf...</template>
