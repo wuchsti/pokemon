@@ -236,6 +236,31 @@ rotierender Pokéball als Lade-Animation. Siehe `frontend/src/style.css`.
     Druckfunktion ("Als PDF speichern") erzeugt das PDF, passend zum
     Composer-freien Hosting-Ansatz dieses Projekts.
 
+## Sammlungs-Browser & Kartensuche beim Tauschen
+
+- **Alle Sets durchsuchbar** (`/collection/vault`, `/collection/trade_binder`,
+  `Collection.vue`): zeigt nicht mehr nur Sets, in denen man schon Karten hat,
+  sondern **alle** offiziellen TCG-Sets mit einem "besessen/gesamt"-Zähler
+  (z. B. "0/102"), inkl. Sets ohne eigene Karten. Ein Suchfeld filtert die
+  Liste nach Set-Namen. Beim Aufklappen eines Sets wird (lazy, erst bei
+  Bedarf via `api/tcg/set_cards.php`) die volle Kartenliste geladen und mit
+  der eigenen Sammlung gemergt: besessene Karten erscheinen farbig mit den
+  gewohnten Aktionen (Zustand/Grading-Badges, Ordner wechseln, entfernen),
+  fehlende Karten erscheinen ausgegraut mit zwei Aktionen - "+ Hinzufügen"
+  (öffnet direkt den CardModal-Dialog, vorbelegt mit dem aktuellen Ordner)
+  und "♡ Merken" (Wunschliste, wie gehabt).
+- **Kartensuche über öffentliche Tausch-Binder** (`/trades`,
+  `api/matchmaking/search.php`): ergänzt die bestehende
+  Wunschlisten-Tauschpartnersuche um eine freie Suche nach Kartennamen -
+  unabhängig davon, ob die Karte auf der eigenen Wunschliste steht. Zeigt,
+  wer die gesuchte Karte in seinem öffentlichen Tausch-Binder hat, mit
+  direktem "Tausch vorschlagen"-Button. Beim Bauen dieser Suche kam ein
+  mehrschichtiger SQL-Bug zutage (dokumentiert als Kommentar im Code):
+  `addcslashes()` escaped in PHP immer mit Backslash, unabhängig vom
+  übergebenen Zeichen-Set, und Backslash-als-SQL-Escape ist ohnehin eine
+  MySQL-Eigenheit, die z. B. SQLite nicht teilt - die Suche escaped
+  `LIKE`-Sonderzeichen (`%`, `_`) deshalb manuell mit `!` statt Backslash.
+
 ## Admin-Bereich
 
 Sichtbar in der Navbar (🛠️ Admin) nur für Accounts mit `is_admin = 1` -

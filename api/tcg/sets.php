@@ -21,5 +21,8 @@ if ($setId !== '') {
     json_response(['set' => $result['data'] ?? null]);
 }
 
-$result = tcg_api_get($config, '/sets', ['orderBy' => '-releaseDate']);
+// Explicit pageSize: the upstream API's own default page size is smaller
+// than the number of sets that exist, which would silently cut off older
+// sets from the "all collections" browser.
+$result = tcg_api_get($config, '/sets', ['orderBy' => '-releaseDate', 'pageSize' => 250]);
 json_response(['sets' => $result['data'] ?? []]);

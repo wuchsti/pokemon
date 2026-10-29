@@ -3,6 +3,7 @@ import { reactive, ref } from 'vue'
 
 const props = defineProps({
   card: { type: Object, required: true }, // pokemontcg.io card object
+  defaultStorageType: { type: String, default: 'vault' },
 })
 const emit = defineEmits(['close', 'saved'])
 
@@ -11,7 +12,7 @@ const gradingCompanies = ['PSA', 'BGS', 'CGC', 'AP Grading']
 const languages = ['DE', 'EN', 'JP', 'FR', 'IT', 'ES']
 
 const form = reactive({
-  storage_type: 'vault',
+  storage_type: props.defaultStorageType,
   card_condition: 'Near Mint',
   language: 'DE',
   is_graded: false,

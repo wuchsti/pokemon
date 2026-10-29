@@ -92,6 +92,7 @@ export const api = {
   sendTradeMessage: (payload) => request('trades/message.php', { method: 'POST', body: payload }),
   confirmTrade: (tradeId) => request('trades/confirm.php', { method: 'POST', body: { trade_id: tradeId } }),
   cancelTrade: (tradeId) => request('trades/cancel.php', { method: 'POST', body: { trade_id: tradeId } }),
+  searchTradeCards: (q) => request(`matchmaking/search.php?${new URLSearchParams({ q })}`),
 
   changeEmail: (payload) => request('auth/change_email.php', { method: 'PUT', body: payload }),
   changePassword: (payload) => request('auth/change_password.php', { method: 'PUT', body: payload }),

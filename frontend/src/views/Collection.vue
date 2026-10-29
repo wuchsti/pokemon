@@ -1,38 +1,61 @@
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { api } from '../api/client'
 import PokeballLoader from '../components/PokeballLoader.vue'
-import SetProgress from '../components/SetProgress.vue'
+import CardModal from '../components/CardModal.vue'
 
 const props = defineProps({
   storageType: { type: String, required: true },
 })
 
-const cards = ref([])
-const setTotals = ref({})
-const loading = ref(true)
-const error = ref('')
-
 const title = computed(() => (props.storageType === 'vault' ? 'Sammlung (Vault)' : 'Tausch-Binder'))
 
-const groupedBySet = computed(() => {
-  const groups = {}
-  for (const card of cards.value) {
-    if (!groups[card.set_id]) {
-      groups[card.set_id] = { setId: card.set_id, cards: [] }
-    }
-    groups[card.set_id].cards.push(card)
+const allSets = ref([])
+const ownedCards = ref([])
+const loading = ref(true)
+const error = ref('')
+const savedMessage = ref('')
+const searchQuery = ref('')
+
+const ownedBySetId = computed(() => {
+  const map = {}
+  for (const card of ownedCards.value) {
+    map[card.set_id] ??= []
+    map[card.set_id].push(card)
   }
-  return Object.values(groups).sort((a, b) => a.setId.localeCompare(b.setId))
+  return map
+})
+
+const setsWithProgress = computed(() => {
+  return allSets.value.map((set) => {
+    const owned = ownedBySetId.value[set.id] ?? []
+    const ownedNumbers = new Set(owned.map((c) => c.card_number))
+    const total = set.printedTotal ?? set.total ?? 0
+    return {
+      ...set,
+      ownedCount: ownedNumbers.size,
+      total,
+      percent: total ? Math.min(100, Math.round((ownedNumbers.size / total) * 100)) : 0,
+    }
+  })
+})
+
+const filteredSets = computed(() => {
+  const q = searchQuery.value.trim().toLowerCase()
+  if (!q) return setsWithProgress.value
+  return setsWithProgress.value.filter((s) => s.name.toLowerCase().includes(q))
 })
 
 async function load() {
   loading.value = true
   error.value = ''
   try {
-    const result = await api.listUserCards({ storage_type: props.storageType })
-    cards.value = result.cards
-    await loadSetTotals()
+    const [setsResult, cardsResult] = await Promise.all([
+      api.listSets(),
+      api.listUserCards({ storage_type: props.storageType }),
+    ])
+    allSets.value = setsResult.sets
+    ownedCards.value = cardsResult.cards
   } catch (e) {
     error.value = e.message
   } finally {
@@ -40,27 +63,83 @@ async function load() {
   }
 }
 
-async function loadSetTotals() {
-  const uniqueSetIds = [...new Set(cards.value.map((c) => c.set_id))]
-  const totals = {}
-  await Promise.all(
-    uniqueSetIds.map(async (setId) => {
-      try {
-        const { set } = await api.getSet(setId)
-        totals[setId] = { name: set?.name ?? setId, total: set?.printedTotal ?? set?.total ?? 0 }
-      } catch {
-        totals[setId] = { name: setId, total: 0 }
-      }
-    })
-  )
-  setTotals.value = totals
+async function reloadOwnedCards() {
+  try {
+    const result = await api.listUserCards({ storage_type: props.storageType })
+    ownedCards.value = result.cards
+  } catch (e) {
+    error.value = e.message
+  }
 }
 
+// --- expand a set into its full card grid (lazy-loaded) ---
+const expandedSetIds = reactive(new Set())
+const setCardsCache = reactive({})
+const wishlistCache = reactive({})
+const loadingSetId = ref(null)
+
+async function toggleExpand(set) {
+  if (expandedSetIds.has(set.id)) {
+    expandedSetIds.delete(set.id)
+    return
+  }
+  expandedSetIds.add(set.id)
+  if (setCardsCache[set.id]) return
+
+  loadingSetId.value = set.id
+  error.value = ''
+  try {
+    const [cardsResult, wishlistResult] = await Promise.all([
+      api.getSetCards(set.id),
+      api.listWishlist({ set_id: set.id }),
+    ])
+    setCardsCache[set.id] = cardsResult.cards
+    wishlistCache[set.id] = new Set(wishlistResult.items.map((i) => i.card_api_id))
+  } catch (e) {
+    error.value = e.message
+    expandedSetIds.delete(set.id)
+  } finally {
+    loadingSetId.value = null
+  }
+}
+
+function tilesForSet(setId) {
+  const official = setCardsCache[setId] ?? []
+  const owned = ownedBySetId.value[setId] ?? []
+
+  const ownedByNumber = {}
+  for (const card of owned) {
+    ownedByNumber[card.card_number] ??= []
+    ownedByNumber[card.card_number].push(card)
+  }
+
+  const seenNumbers = new Set()
+  const tiles = []
+  for (const oc of official) {
+    seenNumbers.add(oc.number)
+    const instances = ownedByNumber[oc.number]
+    if (instances?.length) {
+      for (const instance of instances) tiles.push({ kind: 'owned', ...instance })
+    } else {
+      tiles.push({ kind: 'missing', ...oc })
+    }
+  }
+  // Owned cards the official set list didn't include (rare API edge case) -
+  // never hide a user's own card, just append it.
+  for (const card of owned) {
+    if (!seenNumbers.has(card.card_number)) {
+      tiles.push({ kind: 'owned', ...card })
+    }
+  }
+  return tiles
+}
+
+// --- owned card actions ---
 async function removeCard(card) {
   if (!confirm(`"${card.card_name}" wirklich entfernen?`)) return
   try {
     await api.deleteUserCard(card.id)
-    cards.value = cards.value.filter((c) => c.id !== card.id)
+    ownedCards.value = ownedCards.value.filter((c) => c.id !== card.id)
   } catch (e) {
     error.value = e.message
   }
@@ -70,9 +149,50 @@ async function toggleStorage(card) {
   const newType = card.storage_type === 'vault' ? 'trade_binder' : 'vault'
   try {
     await api.updateUserCard({ id: card.id, storage_type: newType })
-    cards.value = cards.value.filter((c) => c.id !== card.id)
+    ownedCards.value = ownedCards.value.filter((c) => c.id !== card.id)
   } catch (e) {
     error.value = e.message
+  }
+}
+
+// --- missing card actions ---
+const selectedCard = ref(null)
+
+function openAddModal(tile, set) {
+  selectedCard.value = {
+    id: tile.id,
+    name: tile.name,
+    number: tile.number,
+    images: { small: tile.image_small },
+    set: { id: set.id, name: set.name },
+  }
+}
+
+async function onSaved() {
+  savedMessage.value = `${selectedCard.value.name} wurde hinzugefügt!`
+  selectedCard.value = null
+  await reloadOwnedCards()
+  setTimeout(() => (savedMessage.value = ''), 3000)
+}
+
+const addingWishlistId = ref(null)
+
+async function addToWishlist(tile, set) {
+  addingWishlistId.value = tile.id
+  error.value = ''
+  try {
+    await api.addWishlistItem({
+      card_api_id: tile.id,
+      set_id: set.id,
+      card_number: tile.number,
+      card_name: tile.name,
+      image_url: tile.image_small,
+    })
+    wishlistCache[set.id] = new Set([...(wishlistCache[set.id] ?? []), tile.id])
+  } catch (e) {
+    error.value = e.message
+  } finally {
+    addingWishlistId.value = null
   }
 }
 
@@ -85,52 +205,198 @@ watch(() => props.storageType, load)
     <h1 class="font-display">{{ title }}</h1>
 
     <div v-if="error" class="error-banner">{{ error }}</div>
+    <div v-if="savedMessage" class="badge badge-trade saved-toast">{{ savedMessage }}</div>
+
+    <input v-model="searchQuery" type="text" placeholder="Sammlung suchen..." class="set-search" />
 
     <PokeballLoader v-if="loading" />
 
-    <p v-else-if="cards.length === 0">Noch keine Karten hier. Nutze die Kartensuche, um welche hinzuzufügen!</p>
+    <div v-else class="sets-list">
+      <div v-for="set in filteredSets" :key="set.id" class="poke-card set-row">
+        <button type="button" class="set-row-head" @click="toggleExpand(set)">
+          <img v-if="set.images?.symbol" :src="set.images.symbol" class="set-symbol" alt="" />
+          <div class="set-row-info">
+            <strong>{{ set.name }}</strong>
+            <span class="set-row-meta">{{ set.series }} · {{ set.releaseDate }}</span>
+          </div>
+          <div class="set-row-progress">
+            <div class="set-progress-track">
+              <div class="set-progress-fill" :style="{ width: set.percent + '%' }"></div>
+            </div>
+            <span class="set-row-count">{{ set.ownedCount }} / {{ set.total }}</span>
+          </div>
+          <span class="set-row-chevron">{{ expandedSetIds.has(set.id) ? '▲' : '▼' }}</span>
+        </button>
 
-    <div v-else>
-      <section v-for="group in groupedBySet" :key="group.setId" class="set-group">
-        <SetProgress
-          :set-id="group.setId"
-          :set-name="setTotals[group.setId]?.name ?? group.setId"
-          :owned="group.cards.length"
-          :total="setTotals[group.setId]?.total ?? group.cards.length"
-          :owned-numbers="group.cards.map((c) => c.card_number)"
-        />
+        <div v-if="expandedSetIds.has(set.id)" class="set-row-body">
+          <PokeballLoader v-if="loadingSetId === set.id" />
 
-        <div class="card-grid">
-          <div v-for="card in group.cards" :key="card.id" class="card-tile poke-card">
-            <img :src="card.image_url" :alt="card.card_name" />
-            <div class="card-tile-info">
-              <strong>{{ card.card_name }}</strong>
-              <span>#{{ card.card_number }} · {{ card.language }}</span>
-              <div class="card-tile-badges">
-                <span class="badge" :class="props.storageType === 'vault' ? 'badge-vault' : 'badge-trade'">
-                  {{ card.card_condition }}
+          <div v-else class="card-grid">
+            <div
+              v-for="tile in tilesForSet(set.id)"
+              :key="tile.kind + '-' + tile.id"
+              class="card-tile poke-card"
+              :class="{ 'card-tile-missing': tile.kind === 'missing' }"
+            >
+              <img
+                :src="tile.kind === 'owned' ? tile.image_url : tile.image_small"
+                :alt="tile.kind === 'owned' ? tile.card_name : tile.name"
+              />
+              <div class="card-tile-info">
+                <strong>{{ tile.kind === 'owned' ? tile.card_name : tile.name }}</strong>
+                <span>
+                  #{{ tile.kind === 'owned' ? tile.card_number : tile.number }}
+                  <template v-if="tile.kind === 'owned'"> · {{ tile.language }}</template>
                 </span>
-                <span v-if="card.is_graded" class="badge badge-graded">
-                  {{ card.grading_company }} {{ card.grading_score }}
-                </span>
-              </div>
-              <div class="card-tile-actions">
-                <button class="btn btn-outline btn-sm" @click="toggleStorage(card)">
-                  {{ card.storage_type === 'vault' ? '→ Tausch' : '→ Vault' }}
-                </button>
-                <button class="btn btn-primary btn-sm" @click="removeCard(card)">Entfernen</button>
+
+                <template v-if="tile.kind === 'owned'">
+                  <div class="card-tile-badges">
+                    <span class="badge" :class="props.storageType === 'vault' ? 'badge-vault' : 'badge-trade'">
+                      {{ tile.card_condition }}
+                    </span>
+                    <span v-if="tile.is_graded" class="badge badge-graded">
+                      {{ tile.grading_company }} {{ tile.grading_score }}
+                    </span>
+                  </div>
+                  <div class="card-tile-actions">
+                    <button class="btn btn-outline btn-sm" @click="toggleStorage(tile)">
+                      {{ tile.storage_type === 'vault' ? '→ Tausch' : '→ Vault' }}
+                    </button>
+                    <button class="btn btn-primary btn-sm" @click="removeCard(tile)">Entfernen</button>
+                  </div>
+                </template>
+
+                <template v-else>
+                  <div class="card-tile-actions">
+                    <button class="btn btn-accent btn-sm" @click="openAddModal(tile, set)">+ Hinzufügen</button>
+                    <button
+                      class="btn btn-outline btn-sm"
+                      :disabled="wishlistCache[set.id]?.has(tile.id) || addingWishlistId === tile.id"
+                      @click="addToWishlist(tile, set)"
+                    >
+                      {{ wishlistCache[set.id]?.has(tile.id) ? '★' : '♡ Merken' }}
+                    </button>
+                  </div>
+                </template>
               </div>
             </div>
           </div>
         </div>
-      </section>
+      </div>
     </div>
+
+    <CardModal
+      v-if="selectedCard"
+      :card="selectedCard"
+      :default-storage-type="storageType"
+      @close="selectedCard = null"
+      @saved="onSaved"
+    />
   </div>
 </template>
 
 <style scoped>
-.set-group {
-  margin-bottom: 36px;
+.set-search {
+  width: 100%;
+  max-width: 360px;
+  font-family: var(--font-body);
+  font-size: 14px;
+  padding: 10px 12px;
+  border: var(--border-comic);
+  border-radius: var(--radius-sm);
+  margin: 16px 0 20px;
+}
+
+.saved-toast {
+  display: block;
+  width: fit-content;
+  margin-bottom: 16px;
+  padding: 8px 16px;
+  font-size: 14px;
+}
+
+.sets-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.set-row {
+  padding: 0;
+  overflow: hidden;
+}
+
+.set-row-head {
+  width: 100%;
+  background: var(--poke-white);
+  border: none;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  font-family: var(--font-body);
+  color: var(--poke-ink);
+  text-align: left;
+}
+
+.set-symbol {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.set-row-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 160px;
+  flex: 1;
+}
+
+.set-row-meta {
+  font-size: 12px;
+  color: var(--poke-gray);
+  font-weight: 600;
+}
+
+.set-row-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 160px;
+}
+
+.set-progress-track {
+  width: 100px;
+  height: 10px;
+  background: #e9ecf3;
+  border: 2px solid var(--poke-ink);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.set-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--poke-yellow), var(--poke-red));
+}
+
+.set-row-count {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--poke-blue);
+  white-space: nowrap;
+}
+
+.set-row-chevron {
+  color: var(--poke-gray);
+  font-size: 12px;
+}
+
+.set-row-body {
+  border-top: 2px solid var(--poke-ink);
+  padding: 16px;
+  background: var(--poke-bg);
 }
 
 .card-grid {
@@ -150,6 +416,15 @@ watch(() => props.storageType, load)
 .card-tile img {
   width: 100%;
   border-radius: var(--radius-sm);
+}
+
+.card-tile-missing img {
+  opacity: 0.55;
+  filter: grayscale(60%);
+}
+
+.card-tile-missing {
+  background: #f3f3f3;
 }
 
 .card-tile-info {
@@ -173,5 +448,6 @@ watch(() => props.storageType, load)
   display: flex;
   gap: 6px;
   margin-top: 4px;
+  flex-wrap: wrap;
 }
 </style>
