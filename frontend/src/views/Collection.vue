@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { api } from '../api/client'
 import PokeballLoader from '../components/PokeballLoader.vue'
 import CardModal from '../components/CardModal.vue'
@@ -17,6 +17,24 @@ const error = ref('')
 const savedMessage = ref('')
 const searchQuery = ref('')
 const allWishlistIds = ref(new Set())
+
+// --- enlarged card preview (click a card image to read it properly) ---
+const zoomedImage = ref(null)
+
+function zoomImage(src, alt) {
+  if (src) zoomedImage.value = { src, alt }
+}
+
+function closeZoom() {
+  zoomedImage.value = null
+}
+
+function handleZoomKeydown(e) {
+  if (e.key === 'Escape') closeZoom()
+}
+
+onMounted(() => window.addEventListener('keydown', handleZoomKeydown))
+onUnmounted(() => window.removeEventListener('keydown', handleZoomKeydown))
 
 const ownedBySetId = computed(() => {
   const map = {}
@@ -134,7 +152,9 @@ function tilesForSet(setId) {
     seenNumbers.add(oc.number)
     const instances = ownedByNumber[oc.number]
     if (instances?.length) {
-      for (const instance of instances) tiles.push({ kind: 'owned', price_eur: oc.price_eur, ...instance })
+      for (const instance of instances) {
+        tiles.push({ kind: 'owned', price_eur: oc.price_eur, image_large: oc.image_large, ...instance })
+      }
     } else {
       tiles.push({ kind: 'missing', ...oc })
     }
@@ -328,7 +348,12 @@ watch(() => props.storageType, load)
         <p v-if="cardSearchResults.length === 0" class="no-results">Keine Karten gefunden.</p>
         <div v-else class="card-grid card-search-grid">
           <div v-for="card in cardSearchResults" :key="card.id" class="card-tile poke-card">
-            <img :src="card.images?.small" :alt="card.name" />
+            <img
+              :src="card.images?.small"
+              :alt="card.name"
+              class="zoomable"
+              @click="zoomImage(card.images?.large ?? card.images?.small, card.name)"
+            />
             <div class="card-tile-info">
               <strong>{{ card.name }}</strong>
               <span>#{{ card.number }} · {{ card.set?.name }}</span>
@@ -389,6 +414,13 @@ watch(() => props.storageType, load)
               <img
                 :src="tile.kind === 'owned' ? tile.image_url : tile.image_small"
                 :alt="tile.kind === 'owned' ? tile.card_name : tile.name"
+                class="zoomable"
+                @click="
+                  zoomImage(
+                    tile.kind === 'owned' ? (tile.image_large ?? tile.image_url) : tile.image_large,
+                    tile.kind === 'owned' ? tile.card_name : tile.name
+                  )
+                "
               />
               <div class="card-tile-info">
                 <strong>{{ tile.kind === 'owned' ? tile.card_name : tile.name }}</strong>
@@ -441,6 +473,11 @@ watch(() => props.storageType, load)
       @close="selectedCard = null"
       @saved="onSaved"
     />
+
+    <div v-if="zoomedImage" class="zoom-backdrop" @click.self="closeZoom">
+      <button type="button" class="zoom-close" aria-label="Schließen" @click="closeZoom">✕</button>
+      <img :src="zoomedImage.src" :alt="zoomedImage.alt" class="zoom-image" />
+    </div>
   </div>
 </template>
 
@@ -631,6 +668,42 @@ watch(() => props.storageType, load)
 .card-tile img {
   width: 100%;
   border-radius: var(--radius-sm);
+}
+
+.zoomable {
+  cursor: zoom-in;
+}
+
+.zoom-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 1000;
+}
+
+.zoom-image {
+  max-width: min(90vw, 480px);
+  max-height: 85vh;
+  border-radius: var(--radius-md);
+  border: var(--border-comic);
+  box-shadow: 6px 6px 0 rgba(0, 0, 0, 0.5);
+}
+
+.zoom-close {
+  position: absolute;
+  top: 20px;
+  right: 24px;
+  background: var(--poke-white);
+  border: var(--border-comic);
+  border-radius: 999px;
+  width: 36px;
+  height: 36px;
+  font-size: 16px;
+  cursor: pointer;
 }
 
 .card-tile-missing img {

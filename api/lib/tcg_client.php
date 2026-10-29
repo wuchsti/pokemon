@@ -99,6 +99,68 @@ function tcg_api_get(array $config, string $path, array $query = []): array
 }
 
 /**
+ * Live (uncached) fetch of every card in a set, trimmed to the fields the
+ * UI needs plus the current Cardmarket EUR price. Paginates internally.
+ * Shared by tcg/set_cards.php (per-set, cached) and the admin cache-warmer
+ * (bulk, across all sets) so both stay in sync.
+ *
+ * @return array{ok: bool, status: int, data: array, error: ?string}
+ */
+function fetch_set_cards_live(array $config, string $setId): array
+{
+    $cards = [];
+    $page = 1;
+    $pageSize = 250;
+
+    do {
+        $result = tcg_api_request($config, '/cards', [
+            'q' => sprintf('set.id:%s', $setId),
+            'page' => $page,
+            'pageSize' => $pageSize,
+            'orderBy' => 'number',
+        ]);
+
+        if (!$result['ok']) {
+            return $result;
+        }
+
+        $batch = $result['data']['data'] ?? [];
+        foreach ($batch as $card) {
+            $cards[] = [
+                'id' => $card['id'],
+                'number' => $card['number'] ?? '',
+                'name' => $card['name'] ?? '',
+                'image_small' => $card['images']['small'] ?? '',
+                'image_large' => $card['images']['large'] ?? ($card['images']['small'] ?? ''),
+                'price_eur' => extract_cardmarket_price($card),
+            ];
+        }
+
+        $page++;
+    } while (count($batch) === $pageSize && $page <= 5);
+
+    return ['ok' => true, 'status' => 200, 'data' => ['cards' => $cards], 'error' => null];
+}
+
+/**
+ * Live (uncached) fetch of the full set list. Shared by tcg/sets.php
+ * (cached) and the admin cache-warmer (to know which sets to iterate).
+ *
+ * @return array{ok: bool, status: int, data: array, error: ?string}
+ */
+function fetch_all_sets_live(array $config): array
+{
+    // Explicit pageSize: the upstream API's own default page size is
+    // smaller than the number of sets that exist, which would silently
+    // cut off older sets from the "all collections" browser.
+    $result = tcg_api_request($config, '/sets', ['orderBy' => '-releaseDate', 'pageSize' => 250]);
+    if (!$result['ok']) {
+        return $result;
+    }
+    return ['ok' => true, 'status' => 200, 'data' => ['sets' => $result['data']['data'] ?? []], 'error' => null];
+}
+
+/**
  * Extracts the best available Cardmarket EUR price from a card's API data,
  * or null if no Cardmarket pricing is available for that card.
  */

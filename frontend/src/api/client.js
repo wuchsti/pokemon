@@ -106,4 +106,5 @@ export const api = {
   adminStats: () => request('admin/stats.php'),
   adminUpdateContent: (key, value) => request('admin/content/update.php', { method: 'POST', body: { key, value } }),
   adminLogs: (params = {}) => request(`admin/logs.php?${new URLSearchParams(params)}`),
+  adminWarmCache: () => request('admin/warm_cache.php', { method: 'POST' }),
 }

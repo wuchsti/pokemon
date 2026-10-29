@@ -1,3 +1,7 @@
+<script setup>
+import { APP_VERSION } from '../version'
+</script>
+
 <template>
   <footer class="site-footer">
     <div class="container footer-inner">
@@ -8,6 +12,7 @@
         <router-link to="/datenschutz">Datenschutz</router-link>
       </nav>
       <span class="footer-copy">PokéVault ist ein inoffizielles Fan-Projekt, nicht verbunden mit Nintendo, The Pokémon Company oder Game Freak.</span>
+      <span class="footer-version">v{{ APP_VERSION }}</span>
     </div>
   </footer>
 </template>
@@ -48,5 +53,11 @@
   font-size: 11px;
   color: var(--poke-gray);
   max-width: 480px;
+}
+
+.footer-version {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--poke-gray);
 }
 </style>
