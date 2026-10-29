@@ -187,3 +187,13 @@ CREATE TABLE IF NOT EXISTS error_log (
     INDEX idx_error_log_source (source),
     INDEX idx_error_log_created (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 10. API Cache (generischer Key-Value-Cache für selten wechselnde externe
+-- API-Antworten, z.B. die TCG-Set-Liste - vermeidet, dass jeder Seitenaufruf
+-- jedes Nutzers die externe API erneut anfragt, und dient als Fallback,
+-- wenn die externe API gerade down ist)
+CREATE TABLE IF NOT EXISTS api_cache (
+    cache_key VARCHAR(100) PRIMARY KEY,
+    cache_value LONGTEXT NOT NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
