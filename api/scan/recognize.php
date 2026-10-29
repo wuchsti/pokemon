@@ -12,6 +12,7 @@ require_once __DIR__ . '/../lib/db.php';
 require_once __DIR__ . '/../lib/auth_middleware.php';
 require_once __DIR__ . '/../lib/vision_client.php';
 require_once __DIR__ . '/../lib/tcg_client.php';
+require_once __DIR__ . '/../lib/error_log.php';
 
 $config = require __DIR__ . '/../config.php';
 send_cors_headers($config);
@@ -36,7 +37,8 @@ if ($decodedSize > 4 * 1024 * 1024) {
 
 $recognition = recognize_card_image($config, $imageDataUri);
 if (!$recognition['ok']) {
-    json_error($recognition['error'], 502);
+    log_api_error($config, 'vision_api', $recognition['error'] ?? 'Unbekannter Fehler', 'scan/recognize.php');
+    json_error('Die Foto-Erkennung ist gerade nicht verfügbar. Bitte versuch es in ein paar Minuten erneut.', 502);
 }
 
 $extracted = $recognition['data'];

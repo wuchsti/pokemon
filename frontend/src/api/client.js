@@ -105,4 +105,5 @@ export const api = {
   adminDeleteUser: (id) => request('admin/users/delete.php', { method: 'POST', body: { id } }),
   adminStats: () => request('admin/stats.php'),
   adminUpdateContent: (key, value) => request('admin/content/update.php', { method: 'POST', body: { key, value } }),
+  adminLogs: (params = {}) => request(`admin/logs.php?${new URLSearchParams(params)}`),
 }

@@ -3,6 +3,7 @@
     <router-link to="/admin">Übersicht</router-link>
     <router-link to="/admin/users">Nutzer</router-link>
     <router-link to="/admin/content">Impressum &amp; Datenschutz</router-link>
+    <router-link to="/admin/logs">Logs</router-link>
   </nav>
 </template>
 

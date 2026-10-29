@@ -292,6 +292,16 @@ die Navigation ist also kein Sicherheitsmechanismus, nur UI.
   eine Zeile `## Titel` wird zur Überschrift, Leerzeile = neuer Absatz - siehe
   `components/LegalContent.vue`). Die öffentlichen Seiten `/impressum` und
   `/datenschutz` laden diesen Text live, Änderungen erscheinen sofort.
+- **Logs** (`/admin/logs`, `api/admin/logs.php`): technische Fehler externer
+  APIs (Pokémon TCG API, Vision-API) - z. B. Rate-Limits, nicht erreichbare
+  Hosts. Normale Nutzer sehen bei einem solchen Fehler nur eine kurze,
+  generische Meldung ("... gerade nicht erreichbar, bitte später erneut
+  versuchen"); die echten Details (HTTP-Status, Fehlertext der API) landen
+  stattdessen in der Tabelle `error_log` (`api/lib/error_log.php`,
+  `log_api_error()`) und sind nur hier sichtbar. Letzte 200 Einträge,
+  filterbar nach Quelle. Das Logging schluckt eigene Fehler bewusst (z. B.
+  falls die Tabelle auf einer alten Installation noch fehlt) - ein Logging-
+  Problem darf nie der Grund sein, warum ein Request fehlschlägt.
 
 ## Profil (Einstellungen)
 

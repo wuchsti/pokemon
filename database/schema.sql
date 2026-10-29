@@ -176,3 +176,14 @@ PokéVault setzt keine Tracking- oder Werbe-Cookies. Dein Anmelde-Token wird im 
 ## 7. Deine Rechte
 
 Du hast nach der DSGVO insbesondere ein Recht auf Auskunft (Art. 15), Berichtigung (Art. 16), Löschung (Art. 17), Einschränkung der Verarbeitung (Art. 18), Datenübertragbarkeit (Art. 20) und Widerspruch (Art. 21) bezüglich deiner personenbezogenen Daten. Wende dich dazu an die im Impressum genannten Kontaktdaten.');
+
+-- 9. Error Log (technische Fehler externer APIs - für Admins, nie für Nutzer sichtbar)
+CREATE TABLE IF NOT EXISTS error_log (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    source VARCHAR(50) NOT NULL,
+    message TEXT NOT NULL,
+    context VARCHAR(255) NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_error_log_source (source),
+    INDEX idx_error_log_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
