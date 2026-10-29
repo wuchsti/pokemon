@@ -16,6 +16,7 @@ const loading = ref(true)
 const error = ref('')
 const savedMessage = ref('')
 const searchQuery = ref('')
+const allWishlistIds = ref(new Set())
 
 const ownedBySetId = computed(() => {
   const map = {}
@@ -40,22 +41,36 @@ const setsWithProgress = computed(() => {
   })
 })
 
+const showEmptySets = ref(false)
+
 const filteredSets = computed(() => {
   const q = searchQuery.value.trim().toLowerCase()
-  if (!q) return setsWithProgress.value
-  return setsWithProgress.value.filter((s) => s.name.toLowerCase().includes(q))
+  let list = setsWithProgress.value
+  if (!showEmptySets.value) {
+    list = list.filter((s) => s.ownedCount > 0)
+  }
+  if (q) {
+    list = list.filter((s) => s.name.toLowerCase().includes(q))
+  }
+  return list
 })
+
+function formatPrice(value) {
+  return value === null || value === undefined ? '–' : `${Number(value).toFixed(2)} €`
+}
 
 async function load() {
   loading.value = true
   error.value = ''
   try {
-    const [setsResult, cardsResult] = await Promise.all([
+    const [setsResult, cardsResult, wishlistResult] = await Promise.all([
       api.listSets(),
       api.listUserCards({ storage_type: props.storageType }),
+      api.listWishlist(),
     ])
     allSets.value = setsResult.sets
     ownedCards.value = cardsResult.cards
+    allWishlistIds.value = new Set(wishlistResult.items.map((i) => i.card_api_id))
   } catch (e) {
     error.value = e.message
   } finally {
@@ -119,7 +134,7 @@ function tilesForSet(setId) {
     seenNumbers.add(oc.number)
     const instances = ownedByNumber[oc.number]
     if (instances?.length) {
-      for (const instance of instances) tiles.push({ kind: 'owned', ...instance })
+      for (const instance of instances) tiles.push({ kind: 'owned', price_eur: oc.price_eur, ...instance })
     } else {
       tiles.push({ kind: 'missing', ...oc })
     }
@@ -189,6 +204,93 @@ async function addToWishlist(tile, set) {
       image_url: tile.image_small,
     })
     wishlistCache[set.id] = new Set([...(wishlistCache[set.id] ?? []), tile.id])
+    allWishlistIds.value = new Set([...allWishlistIds.value, tile.id])
+  } catch (e) {
+    error.value = e.message
+  } finally {
+    addingWishlistId.value = null
+  }
+}
+
+async function removeFromWishlist(tile, set) {
+  addingWishlistId.value = tile.id
+  error.value = ''
+  try {
+    await api.removeWishlistItem({ card_api_id: tile.id })
+    const updated = new Set(wishlistCache[set.id] ?? [])
+    updated.delete(tile.id)
+    wishlistCache[set.id] = updated
+    const updatedAll = new Set(allWishlistIds.value)
+    updatedAll.delete(tile.id)
+    allWishlistIds.value = updatedAll
+  } catch (e) {
+    error.value = e.message
+  } finally {
+    addingWishlistId.value = null
+  }
+}
+
+// --- global card search (by name or collector number, across all sets) ---
+const cardQuery = ref('')
+const cardSearchLoading = ref(false)
+const cardSearchError = ref('')
+const cardSearchResults = ref([])
+const cardSearchDone = ref(false)
+
+async function searchCards() {
+  const q = cardQuery.value.trim()
+  if (!q) return
+  cardSearchLoading.value = true
+  cardSearchError.value = ''
+  cardSearchDone.value = true
+  try {
+    const result = await api.searchCards({ q, pageSize: 24 })
+    cardSearchResults.value = result.cards
+  } catch (e) {
+    cardSearchError.value = e.message
+  } finally {
+    cardSearchLoading.value = false
+  }
+}
+
+function clearCardSearch() {
+  cardQuery.value = ''
+  cardSearchResults.value = []
+  cardSearchDone.value = false
+  cardSearchError.value = ''
+}
+
+function openAddModalFromSearch(card) {
+  selectedCard.value = card
+}
+
+async function addToWishlistFromSearch(card) {
+  addingWishlistId.value = card.id
+  error.value = ''
+  try {
+    await api.addWishlistItem({
+      card_api_id: card.id,
+      set_id: card.set?.id ?? '',
+      card_number: card.number,
+      card_name: card.name,
+      image_url: card.images?.small ?? '',
+    })
+    allWishlistIds.value = new Set([...allWishlistIds.value, card.id])
+  } catch (e) {
+    error.value = e.message
+  } finally {
+    addingWishlistId.value = null
+  }
+}
+
+async function removeFromWishlistFromSearch(card) {
+  addingWishlistId.value = card.id
+  error.value = ''
+  try {
+    await api.removeWishlistItem({ card_api_id: card.id })
+    const updated = new Set(allWishlistIds.value)
+    updated.delete(card.id)
+    allWishlistIds.value = updated
   } catch (e) {
     error.value = e.message
   } finally {
@@ -207,7 +309,53 @@ watch(() => props.storageType, load)
     <div v-if="error" class="error-banner">{{ error }}</div>
     <div v-if="savedMessage" class="badge badge-trade saved-toast">{{ savedMessage }}</div>
 
-    <input v-model="searchQuery" type="text" placeholder="Sammlung suchen..." class="set-search" />
+    <div class="poke-panel card-search-panel">
+      <h3 class="font-display card-search-title">Karte suchen</h3>
+      <p class="card-search-hint">Nach Name oder Kartennummer (z.B. "Prinplup" oder "28/94") - über alle Sammlungen hinweg.</p>
+      <form class="card-search-row" @submit.prevent="searchCards">
+        <input v-model="cardQuery" type="text" placeholder="Name oder Nummer..." class="set-search" />
+        <button type="submit" class="btn btn-primary btn-sm" :disabled="cardSearchLoading">
+          {{ cardSearchLoading ? 'Suche...' : '🔍 Suchen' }}
+        </button>
+        <button v-if="cardSearchDone" type="button" class="btn btn-outline btn-sm" @click="clearCardSearch">
+          Zurücksetzen
+        </button>
+      </form>
+
+      <div v-if="cardSearchError" class="error-banner">{{ cardSearchError }}</div>
+
+      <template v-if="cardSearchDone && !cardSearchLoading && !cardSearchError">
+        <p v-if="cardSearchResults.length === 0" class="no-results">Keine Karten gefunden.</p>
+        <div v-else class="card-grid card-search-grid">
+          <div v-for="card in cardSearchResults" :key="card.id" class="card-tile poke-card">
+            <img :src="card.images?.small" :alt="card.name" />
+            <div class="card-tile-info">
+              <strong>{{ card.name }}</strong>
+              <span>#{{ card.number }} · {{ card.set?.name }}</span>
+              <span class="card-tile-price">{{ formatPrice(card.price_eur) }}</span>
+              <div class="card-tile-actions">
+                <button class="btn btn-accent btn-sm" @click="openAddModalFromSearch(card)">+ Hinzufügen</button>
+                <button
+                  class="btn btn-outline btn-sm"
+                  :disabled="addingWishlistId === card.id"
+                  @click="allWishlistIds.has(card.id) ? removeFromWishlistFromSearch(card) : addToWishlistFromSearch(card)"
+                >
+                  {{ allWishlistIds.has(card.id) ? '★ Entfernen' : '♡ Merken' }}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </template>
+    </div>
+
+    <div class="set-filter-row">
+      <input v-model="searchQuery" type="text" placeholder="Sammlung filtern (nach Titel)..." class="set-search" />
+      <label class="empty-sets-toggle">
+        <input type="checkbox" v-model="showEmptySets" />
+        Leere Sammlungen einblenden
+      </label>
+    </div>
 
     <PokeballLoader v-if="loading" />
 
@@ -248,6 +396,7 @@ watch(() => props.storageType, load)
                   #{{ tile.kind === 'owned' ? tile.card_number : tile.number }}
                   <template v-if="tile.kind === 'owned'"> · {{ tile.language }}</template>
                 </span>
+                <span class="card-tile-price">{{ formatPrice(tile.price_eur) }}</span>
 
                 <template v-if="tile.kind === 'owned'">
                   <div class="card-tile-badges">
@@ -271,10 +420,10 @@ watch(() => props.storageType, load)
                     <button class="btn btn-accent btn-sm" @click="openAddModal(tile, set)">+ Hinzufügen</button>
                     <button
                       class="btn btn-outline btn-sm"
-                      :disabled="wishlistCache[set.id]?.has(tile.id) || addingWishlistId === tile.id"
-                      @click="addToWishlist(tile, set)"
+                      :disabled="addingWishlistId === tile.id"
+                      @click="wishlistCache[set.id]?.has(tile.id) ? removeFromWishlist(tile, set) : addToWishlist(tile, set)"
                     >
-                      {{ wishlistCache[set.id]?.has(tile.id) ? '★' : '♡ Merken' }}
+                      {{ wishlistCache[set.id]?.has(tile.id) ? '★ Entfernen' : '♡ Merken' }}
                     </button>
                   </div>
                 </template>
@@ -305,6 +454,72 @@ watch(() => props.storageType, load)
   border: var(--border-comic);
   border-radius: var(--radius-sm);
   margin: 16px 0 20px;
+}
+
+.card-search-panel {
+  margin: 16px 0 20px;
+  padding: 16px;
+}
+
+.card-search-title {
+  margin: 0 0 4px;
+}
+
+.card-search-hint {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: var(--poke-gray);
+  font-weight: 600;
+}
+
+.card-search-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.card-search-row .set-search {
+  margin: 0;
+  flex: 1;
+  min-width: 200px;
+}
+
+.card-search-grid {
+  margin-top: 16px;
+}
+
+.no-results {
+  margin-top: 12px;
+  font-weight: 600;
+  color: var(--poke-gray);
+}
+
+.card-tile-price {
+  font-weight: 700;
+  color: var(--poke-blue);
+}
+
+.set-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin: 0 0 20px;
+}
+
+.set-filter-row .set-search {
+  margin: 0;
+}
+
+.empty-sets-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
 }
 
 .saved-toast {
