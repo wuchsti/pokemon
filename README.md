@@ -3,11 +3,15 @@
 Webanwendung zur Verwaltung, Bewertung und Foto-Erkennung von Pokémon-Sammelkarten.
 Gebaut für ein Netcup Webhosting-Paket (Plesk, PHP 8.x, MariaDB).
 
-Dieses Repository enthält aktuell **Phase 1 (MVP Core & Authentication)**:
-Benutzer-Registrierung/Login, Pokémon-TCG-Kartensuche, und die Verwaltung der
+Dieses Repository enthält aktuell **Phase 1 (MVP Core & Authentication)** und
+**Phase 2 (Wertermittlung, Preis-Historie & Profil-Dashboard)**:
+Benutzer-Registrierung/Login, Pokémon-TCG-Kartensuche, die Verwaltung der
 eigenen Sammlung (Vault) und des Tausch-Binders inkl. Zustand, Sprache und
-Grading. Phasen 2–4 (Preis-Historie & Dashboard-Statistiken, Foto-Erkennung,
-Social Features & Export) folgen als nächste Ausbaustufen.
+Grading, ein täglicher Cardmarket-Preis-Sync, ein Dashboard mit Gesamtwert
+(getrennt nach Vault/Tauschbinder), Top-5-Schätzen, einem Wertverlaufs-Chart
+und Tagesgewinnern/-verlierern, sowie eine Wunschlisten-Funktion für fehlende
+Karten. Phasen 3–4 (Foto-Erkennung, Social Features & Export) folgen als
+nächste Ausbaustufen.
 
 ## Architektur
 
@@ -27,20 +31,23 @@ Social Features & Export) folgen als nächste Ausbaustufen.
 ```
 api/
   config.php         # Zentrale Konfiguration (liest ENV / .env)
-  lib/                # jwt.php, db.php, response.php, auth_middleware.php, tcg_client.php
+  lib/                # jwt.php, db.php, response.php, auth_middleware.php,
+                      # tcg_client.php, price_stats.php
   auth/               # register.php, login.php, me.php
   cards/              # list.php, add.php, update.php, delete.php (user_cards CRUD)
-  tcg/                # search.php, sets.php (Proxy zu pokemontcg.io)
+  tcg/                # search.php, sets.php, set_cards.php (Proxy zu pokemontcg.io)
+  stats/              # dashboard.php (Gesamtwert, Top 5, Verlauf, Tagesgewinner/-verlierer)
+  wishlist/           # list.php, add.php, remove.php
 database/
-  schema.sql          # users, user_cards, price_history
+  schema.sql          # users, user_cards, price_history, wishlist_items
 frontend/
   src/
-    views/            # Login, Register, Dashboard, Collection, CardSearch
-    components/       # Navbar, PokeballLoader, SetProgress, CardModal
+    views/            # Login, Register, Dashboard, Collection, CardSearch, Wishlist
+    components/       # Navbar, PokeballLoader, SetProgress, CardModal, ValueChart
     stores/auth.js     # Pinia Auth-Store
     api/client.js      # Fetch-Wrapper für /api/*
 cron/
-  (Phase 2) sync_prices.php für den täglichen Cardmarket-Preis-Sync
+  sync_prices.php     # Täglicher Cardmarket-Preis-Sync
 ```
 
 ## Lokale Entwicklung
@@ -78,7 +85,14 @@ Vite proxyt `/api/*`-Requests im Dev-Modus auf `http://localhost:8080`
 5. `.htaccess` in `httpdocs/` (aus `frontend/public/.htaccess`, wird beim Build
    automatisch mit kopiert) sorgt für das SPA-Routing; `api/.htaccess` schützt
    interne Dateien.
-6. (Phase 2) Plesk Task Scheduler: täglicher Cronjob für `cron/sync_prices.php`.
+6. In Plesk unter "Geplante Aufgaben" (Task Scheduler) einen täglichen Cronjob
+   für `cron/sync_prices.php` einrichten, z. B.:
+   ```bash
+   php /var/www/vhosts/<domain>/httpdocs/cron/sync_prices.php
+   ```
+   Das Skript fragt für jede in `user_cards` vorhandene Karte den aktuellen
+   Cardmarket-Preis ab und schreibt einen Eintrag pro Tag in `price_history`.
+   Mehrfaches Ausführen am selben Tag aktualisiert nur den heutigen Eintrag.
 
 ## Design
 
@@ -87,9 +101,28 @@ Pikachu-Gelb (`#FFDE00`), Pokémon-Blau (`#3B4CCA`), abgerundete Ecken,
 fette Comic-Outlines, Drop-Shadows, Fredoka/Nunito-Schriftarten und ein
 rotierender Pokéball als Lade-Animation. Siehe `frontend/src/style.css`.
 
-## Nächste Schritte (Phase 2–4)
+## Phase 2 im Detail
 
-- Preis-Historie + täglicher Cronjob (`cron/sync_prices.php`), Dashboard mit
-  Gesamtwert, Top-5-Schätze, Wertentwicklungs-Chart (Chart.js).
+- **Preis-Sync**: `cron/sync_prices.php` holt pro Karte den besten verfügbaren
+  Cardmarket-EUR-Preis (`trendPrice` → `averageSellPrice` → Tagesdurchschnitte
+  als Fallback) und schreibt ihn in `price_history`.
+- **Dashboard-Statistiken** (`api/stats/dashboard.php`, `api/lib/price_stats.php`):
+  - Gesamtwert getrennt nach Vault und Tauschbinder.
+  - Top-5-Schätze: die wertvollsten einzelnen Karteninstanzen.
+  - 30-Tage-Wertverlauf (mit Forward-Fill für Tage ohne neuen Sync), als
+    Comic-gestylter Chart.js-Chart mit Legende, Crosshair-Tooltip, Endwert-
+    Beschriftung und Tabellen-Ansicht als Fallback.
+  - **Tagesgewinner/-verlierer**: vergleicht die letzten zwei Preis-Syncs
+    jeder Karte und hebt die größte prozentuale Bewegung nach oben/unten
+    hervor – wie bei einem Krypto-/Aktien-Portfolio.
+- **Wunschliste**: In der Sammlung kann pro Set "Fehlende Karten anzeigen"
+  geöffnet werden (lädt alle Karten des Sets via `api/tcg/set_cards.php` und
+  vergleicht sie mit den eigenen Kartennummern). Von dort lassen sich fehlende
+  Karten per Klick zur Wunschliste hinzufügen (`api/wishlist/*`, Tabelle
+  `wishlist_items`), einsehbar unter `/wishlist`.
+
+## Nächste Schritte (Phase 3–4)
+
 - Kamera-/Foto-Erkennung (OCR) zum Schnell-Erfassen von Karten.
-- Öffentliche Sammler-Profile, Tausch-Matchmaking, CSV/PDF-Export.
+- Öffentliche Sammler-Profile, Tausch-Matchmaking (auch unter Einbeziehung der
+  Wunschliste), CSV/PDF-Export.

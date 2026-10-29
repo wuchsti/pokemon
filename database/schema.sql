@@ -43,3 +43,19 @@ CREATE TABLE IF NOT EXISTS price_history (
     UNIQUE KEY unique_card_date (card_api_id, recorded_at),
     INDEX idx_price_history_card (card_api_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 4. Wishlist (fehlende Karten, die ein Nutzer sich für ein Set gemerkt hat)
+CREATE TABLE IF NOT EXISTS wishlist_items (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    card_api_id VARCHAR(100) NOT NULL,
+    set_id VARCHAR(100) NOT NULL,
+    card_number VARCHAR(20) NOT NULL,
+    card_name VARCHAR(150) NOT NULL,
+    image_url VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    UNIQUE KEY unique_user_card (user_id, card_api_id),
+    INDEX idx_wishlist_user (user_id),
+    INDEX idx_wishlist_set (set_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

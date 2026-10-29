@@ -24,6 +24,7 @@ function logout() {
         <router-link to="/collection/vault">Vault</router-link>
         <router-link to="/collection/trade_binder">Tauschbinder</router-link>
         <router-link to="/search">Karten suchen</router-link>
+        <router-link to="/wishlist">Wunschliste</router-link>
         <button class="btn btn-outline btn-sm" @click="logout">Abmelden</button>
       </nav>
     </div>

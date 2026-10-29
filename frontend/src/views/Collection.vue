@@ -93,9 +93,11 @@ watch(() => props.storageType, load)
     <div v-else>
       <section v-for="group in groupedBySet" :key="group.setId" class="set-group">
         <SetProgress
+          :set-id="group.setId"
           :set-name="setTotals[group.setId]?.name ?? group.setId"
           :owned="group.cards.length"
           :total="setTotals[group.setId]?.total ?? group.cards.length"
+          :owned-numbers="group.cards.map((c) => c.card_number)"
         />
 
         <div class="card-grid">

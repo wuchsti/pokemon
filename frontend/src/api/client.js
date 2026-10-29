@@ -52,4 +52,11 @@ export const api = {
   addUserCard: (payload) => request('cards/add.php', { method: 'POST', body: payload }),
   updateUserCard: (payload) => request('cards/update.php', { method: 'PUT', body: payload }),
   deleteUserCard: (id) => request('cards/delete.php', { method: 'DELETE', body: { id } }),
+
+  dashboardStats: () => request('stats/dashboard.php'),
+  getSetCards: (setId) => request(`tcg/set_cards.php?${new URLSearchParams({ setId })}`),
+
+  listWishlist: (params = {}) => request(`wishlist/list.php?${new URLSearchParams(params)}`),
+  addWishlistItem: (payload) => request('wishlist/add.php', { method: 'POST', body: payload }),
+  removeWishlistItem: (payload) => request('wishlist/remove.php', { method: 'DELETE', body: payload }),
 }

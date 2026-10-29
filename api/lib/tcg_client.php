@@ -3,11 +3,13 @@
 require_once __DIR__ . '/response.php';
 
 /**
- * Performs a GET request against the Pokémon TCG API (api.pokemontcg.io)
- * and returns the decoded JSON body. Ends the request with a proxied error
- * status on failure.
+ * Performs a raw GET request against the Pokémon TCG API (api.pokemontcg.io).
+ * Never ends the script; always returns a result shape so both the HTTP
+ * endpoints and the CLI cronjob can decide how to react to a failure.
+ *
+ * @return array{ok: bool, status: int, data: array, error: ?string}
  */
-function tcg_api_get(array $config, string $path, array $query = []): array
+function tcg_api_request(array $config, string $path, array $query = []): array
 {
     $url = rtrim($config['tcg_api']['base_url'], '/') . '/' . ltrim($path, '/');
     if ($query !== []) {
@@ -33,17 +35,58 @@ function tcg_api_get(array $config, string $path, array $query = []): array
     curl_close($ch);
 
     if ($responseBody === false) {
-        json_error('Pokémon TCG API nicht erreichbar: ' . $curlError, 502);
+        return ['ok' => false, 'status' => 502, 'data' => [], 'error' => "Nicht erreichbar: $curlError"];
     }
 
     $decoded = json_decode($responseBody, true);
     if (!is_array($decoded)) {
-        json_error('Ungültige Antwort der Pokémon TCG API.', 502);
+        return ['ok' => false, 'status' => 502, 'data' => [], 'error' => 'Ungültige JSON-Antwort.'];
     }
 
     if ($statusCode >= 400) {
-        json_error($decoded['error']['message'] ?? 'Fehler bei der Pokémon TCG API.', $statusCode);
+        return [
+            'ok' => false,
+            'status' => $statusCode,
+            'data' => $decoded,
+            'error' => $decoded['error']['message'] ?? 'Fehler bei der Pokémon TCG API.',
+        ];
     }
 
-    return $decoded;
+    return ['ok' => true, 'status' => $statusCode, 'data' => $decoded, 'error' => null];
+}
+
+/**
+ * Same as tcg_api_request(), but ends the HTTP request with a proxied error
+ * status on failure. Only use this from api/*.php endpoints, never from CLI
+ * scripts (the cronjob should keep going after one card fails).
+ */
+function tcg_api_get(array $config, string $path, array $query = []): array
+{
+    $result = tcg_api_request($config, $path, $query);
+
+    if (!$result['ok']) {
+        json_error($result['error'] ?? 'Fehler bei der Pokémon TCG API.', $result['status']);
+    }
+
+    return $result['data'];
+}
+
+/**
+ * Extracts the best available Cardmarket EUR price from a card's API data,
+ * or null if no Cardmarket pricing is available for that card.
+ */
+function extract_cardmarket_price(array $card): ?float
+{
+    $prices = $card['cardmarket']['prices'] ?? null;
+    if (!is_array($prices)) {
+        return null;
+    }
+
+    foreach (['trendPrice', 'averageSellPrice', 'avg30', 'avg7', 'avg1', 'lowPrice'] as $key) {
+        if (isset($prices[$key]) && is_numeric($prices[$key]) && $prices[$key] > 0) {
+            return round((float) $prices[$key], 2);
+        }
+    }
+
+    return null;
 }

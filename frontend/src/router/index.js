@@ -24,6 +24,12 @@ const routes = [
     component: () => import('../views/CardSearch.vue'),
     meta: { requiresAuth: true },
   },
+  {
+    path: '/wishlist',
+    name: 'wishlist',
+    component: () => import('../views/Wishlist.vue'),
+    meta: { requiresAuth: true },
+  },
 ]
 
 const router = createRouter({
