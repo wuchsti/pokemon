@@ -1,0 +1,14 @@
+# Protect internal library/config files from direct HTTP access.
+# Only the top-level endpoint scripts (auth/*.php, cards/*.php, tcg/*.php)
+# should be reachable.
+
+<FilesMatch "^(config\.php)$">
+    Require all denied
+</FilesMatch>
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^lib/ - [F,L]
+</IfModule>
+
+Options -Indexes

@@ -1,0 +1,45 @@
+-- PokéVault Database Schema (MariaDB / MySQL)
+-- Run this once on the Netcup / Plesk MariaDB database.
+
+SET NAMES utf8mb4;
+
+-- 1. Users
+CREATE TABLE IF NOT EXISTS users (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(50) NOT NULL UNIQUE,
+    email VARCHAR(100) NOT NULL UNIQUE,
+    password_hash VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 2. User Cards Collection (Sammlung, Trade-Binder & Grading)
+CREATE TABLE IF NOT EXISTS user_cards (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    card_api_id VARCHAR(100) NOT NULL,
+    set_id VARCHAR(100) NOT NULL,
+    card_number VARCHAR(20) NOT NULL,
+    card_name VARCHAR(150) NOT NULL,
+    image_url VARCHAR(255) NOT NULL,
+    storage_type ENUM('vault', 'trade_binder') DEFAULT 'vault',
+    card_condition ENUM('Mint', 'Near Mint', 'Excellent', 'Good', 'Light Played', 'Played', 'Poor') DEFAULT 'Near Mint',
+    language VARCHAR(10) DEFAULT 'DE',
+    is_graded BOOLEAN DEFAULT FALSE,
+    grading_company VARCHAR(50) NULL,
+    grading_score DECIMAL(3,1) NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_user_cards_user (user_id),
+    INDEX idx_user_cards_set (set_id),
+    INDEX idx_user_cards_api_id (card_api_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 3. Price History Tracker
+CREATE TABLE IF NOT EXISTS price_history (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    card_api_id VARCHAR(100) NOT NULL,
+    price_eur DECIMAL(10,2) NOT NULL,
+    recorded_at DATE NOT NULL,
+    UNIQUE KEY unique_card_date (card_api_id, recorded_at),
+    INDEX idx_price_history_card (card_api_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
