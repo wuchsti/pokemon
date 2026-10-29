@@ -56,6 +56,8 @@ $result = tcg_api_get($config, '/cards', [
 $cards = array_map(function (array $card): array {
     $card['price_eur'] = extract_cardmarket_price($card);
     $card['price_updated_at'] = extract_cardmarket_updated_at($card);
+    $card['price_usd'] = extract_tcgplayer_price($card);
+    $card['price_usd_updated_at'] = extract_tcgplayer_updated_at($card);
     return $card;
 }, $result['data'] ?? []);
 
