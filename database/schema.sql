@@ -60,3 +60,31 @@ CREATE TABLE IF NOT EXISTS wishlist_items (
     INDEX idx_wishlist_user (user_id),
     INDEX idx_wishlist_set (set_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 5. Trades (Tausch-Thread zwischen zwei Nutzern, per Nickname - nie per E-Mail)
+CREATE TABLE IF NOT EXISTS trades (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_a_id INT NOT NULL,
+    user_b_id INT NOT NULL,
+    status ENUM('open', 'completed', 'cancelled') NOT NULL DEFAULT 'open',
+    user_a_confirmed BOOLEAN NOT NULL DEFAULT FALSE,
+    user_b_confirmed BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_a_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_b_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_trades_user_a (user_a_id),
+    INDEX idx_trades_user_b (user_b_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 6. Trade-Nachrichten (Absprache zu Ablauf/Versand innerhalb eines Tauschs)
+CREATE TABLE IF NOT EXISTS trade_messages (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    trade_id INT NOT NULL,
+    sender_user_id INT NOT NULL,
+    body TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (trade_id) REFERENCES trades(id) ON DELETE CASCADE,
+    FOREIGN KEY (sender_user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_trade_messages_trade (trade_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

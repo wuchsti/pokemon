@@ -85,4 +85,11 @@ export const api = {
     link.remove()
     URL.revokeObjectURL(url)
   },
+
+  createTrade: (payload) => request('trades/create.php', { method: 'POST', body: payload }),
+  listTrades: () => request('trades/list.php'),
+  getTrade: (id) => request(`trades/get.php?${new URLSearchParams({ id })}`),
+  sendTradeMessage: (payload) => request('trades/message.php', { method: 'POST', body: payload }),
+  confirmTrade: (tradeId) => request('trades/confirm.php', { method: 'POST', body: { trade_id: tradeId } }),
+  cancelTrade: (tradeId) => request('trades/cancel.php', { method: 'POST', body: { trade_id: tradeId } }),
 }

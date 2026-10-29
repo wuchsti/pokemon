@@ -1,7 +1,10 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { api } from '../api/client'
 import PokeballLoader from '../components/PokeballLoader.vue'
+
+const router = useRouter()
 
 const items = ref([])
 const loading = ref(true)
@@ -56,6 +59,21 @@ async function searchTraders() {
     tradersError.value = e.message
   } finally {
     loadingTraders.value = false
+  }
+}
+
+const startingTradeWith = ref(null)
+
+async function proposeTrade(username) {
+  startingTradeWith.value = username
+  tradersError.value = ''
+  try {
+    const { trade } = await api.createTrade({ partner_username: username })
+    router.push(`/trades/${trade.id}`)
+  } catch (e) {
+    tradersError.value = e.message
+  } finally {
+    startingTradeWith.value = null
   }
 }
 
@@ -134,9 +152,18 @@ onMounted(load)
               :title="`${match.card_name} (#${match.card_number}, ${match.card_condition})`"
             />
           </div>
-          <router-link :to="`/user/${trader.username}/binder`" class="btn btn-outline btn-sm" target="_blank">
-            Tausch-Binder ansehen
-          </router-link>
+          <div class="trader-actions">
+            <router-link :to="`/user/${trader.username}/binder`" class="btn btn-outline btn-sm" target="_blank">
+              Tausch-Binder ansehen
+            </router-link>
+            <button
+              class="btn btn-primary btn-sm"
+              :disabled="startingTradeWith === trader.username"
+              @click="proposeTrade(trader.username)"
+            >
+              💬 Tausch vorschlagen
+            </button>
+          </div>
         </div>
       </div>
     </section>
@@ -246,5 +273,11 @@ onMounted(load)
   width: 48px;
   border-radius: 6px;
   border: 2px solid var(--poke-ink);
+}
+
+.trader-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 </style>

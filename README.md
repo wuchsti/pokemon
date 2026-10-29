@@ -15,8 +15,9 @@ Grading, ein täglicher Cardmarket-Preis-Sync, ein Dashboard mit Gesamtwert
 und Tagesgewinnern/-verlierern, eine Wunschlisten-Funktion für fehlende
 Karten, ein Kamera-/Foto-Scan-Flow zur schnellen Karten-Erfassung per
 Vision-API, ein öffentlicher Tausch-Binder-Link mit Tauschpartner-Matchmaking,
-sowie CSV- und Druck-/PDF-Export. Offen ist nur noch das in der README
-dokumentierte **Backlog** (Startseite, FAQ, Impressum, Datenschutz).
+ein Tausch-Chat mit beidseitiger Erfolgsbestätigung, sowie CSV- und
+Druck-/PDF-Export. Offen ist nur noch das in der README dokumentierte
+**Backlog** (Startseite, FAQ, Impressum, Datenschutz).
 
 ## Architektur
 
@@ -47,13 +48,14 @@ api/
   public/             # binder.php (öffentlicher Tausch-Binder, keine Auth)
   matchmaking/        # find_traders.php (Wunschliste vs. öffentliche Tausch-Binder)
   export/             # cards.php (JSON), csv.php (CSV-Download)
+  trades/             # create.php, list.php, get.php, message.php, confirm.php, cancel.php
 database/
-  schema.sql          # users, user_cards, price_history, wishlist_items
+  schema.sql          # users, user_cards, price_history, wishlist_items, trades, trade_messages
   migrations/         # ALTER-Skripte für bereits bestehende Installationen
 frontend/
   src/
     views/            # Login, Register, Dashboard, Collection, CardSearch, Wishlist,
-                      # Scan, Settings, Export, PrintExport, PublicBinder
+                      # Scan, Settings, Export, PrintExport, PublicBinder, Trades, TradeDetail
     components/       # Navbar, PokeballLoader, SetProgress, CardModal, ValueChart, CardScanner
     utils/image.js     # Foto-Resize/Komprimierung (Kamera + Upload) vor dem Hochladen
     stores/auth.js     # Pinia Auth-Store
@@ -177,6 +179,16 @@ rotierender Pokéball als Lade-Animation. Siehe `frontend/src/style.css`.
   jeweiligen Tausch-Binder. Bewusst nur in diese Richtung (meine Wunschliste
   vs. deren öffentlicher Binder): die Wunschlisten anderer Nutzer bleiben
   privat, da dafür kein Opt-in existiert.
+- **Tausch-Chat & Bestätigung** (`/trades`, Tabellen `trades` + `trade_messages`):
+  Aus der Tauschpartner-Suche oder einem öffentlichen Tausch-Binder heraus
+  (oder direkt per Nickname auf `/trades`) lässt sich ein Tausch-Thread
+  starten. Beide Seiten sehen sich dort **ausschließlich beim Nickname**
+  (nie per E-Mail), können Nachrichten zu Ablauf/Versand austauschen
+  (`api/trades/message.php`, Polling alle 6s statt WebSockets) und den
+  Tausch einzeln bestätigen (`api/trades/confirm.php`); erst wenn **beide**
+  bestätigt haben, wechselt der Status zu "completed". Ein offener Tausch
+  kann jederzeit abgebrochen werden (`api/trades/cancel.php`), ein
+  abgeschlossener nicht mehr.
 - **Export** (`/export`):
   - **CSV** (`api/export/csv.php`): komplette Sammlung (Vault + Tausch-Binder)
     inkl. Preis, Zustand, Sprache und Grading, Semikolon-getrennt für

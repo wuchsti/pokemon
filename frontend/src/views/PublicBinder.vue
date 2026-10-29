@@ -1,15 +1,24 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { api } from '../api/client'
+import { useAuthStore } from '../stores/auth'
 import PokeballLoader from '../components/PokeballLoader.vue'
 
 const props = defineProps({
   username: { type: String, required: true },
 })
 
+const router = useRouter()
+const auth = useAuthStore()
+
 const cards = ref([])
 const loading = ref(true)
 const notFound = ref(false)
+const error = ref('')
+const startingTrade = ref(false)
+
+const canProposeTrade = computed(() => auth.isAuthenticated && auth.user?.username !== props.username)
 
 const groupedBySet = computed(() => {
   const groups = {}
@@ -33,6 +42,19 @@ async function load() {
   }
 }
 
+async function proposeTrade() {
+  startingTrade.value = true
+  error.value = ''
+  try {
+    const { trade } = await api.createTrade({ partner_username: props.username })
+    router.push(`/trades/${trade.id}`)
+  } catch (e) {
+    error.value = e.message
+  } finally {
+    startingTrade.value = false
+  }
+}
+
 onMounted(load)
 </script>
 
@@ -49,6 +71,15 @@ onMounted(load)
       <h1 class="font-display">Tausch-Binder von {{ username }}</h1>
       <p class="subtitle">
         Interessiert an einem Tausch? Diese Karten stehen zum Tausch bereit.
+      </p>
+
+      <div v-if="error" class="error-banner">{{ error }}</div>
+
+      <button v-if="canProposeTrade" class="btn btn-primary propose-btn" :disabled="startingTrade" @click="proposeTrade">
+        💬 Tausch mit {{ username }} vorschlagen
+      </button>
+      <p v-else-if="!auth.isAuthenticated" class="login-hint">
+        <router-link to="/login">Melde dich an</router-link>, um {{ username }} einen Tausch vorzuschlagen.
       </p>
 
       <p v-if="cards.length === 0">Dieser Tausch-Binder ist aktuell leer.</p>
@@ -91,6 +122,15 @@ onMounted(load)
   color: var(--poke-gray);
   font-weight: 600;
   margin-top: -6px;
+}
+
+.propose-btn {
+  margin-bottom: 20px;
+}
+
+.login-hint {
+  font-weight: 600;
+  margin-bottom: 20px;
 }
 
 .set-group {

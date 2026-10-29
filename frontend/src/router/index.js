@@ -60,6 +60,19 @@ const routes = [
     component: () => import('../views/PublicBinder.vue'),
     props: true,
   },
+  {
+    path: '/trades',
+    name: 'trades',
+    component: () => import('../views/Trades.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/trades/:id',
+    name: 'trade-detail',
+    component: () => import('../views/TradeDetail.vue'),
+    meta: { requiresAuth: true },
+    props: true,
+  },
 ]
 
 const router = createRouter({

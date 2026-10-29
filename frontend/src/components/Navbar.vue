@@ -1,9 +1,12 @@
 <script setup>
+import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 
 const auth = useAuthStore()
 const router = useRouter()
+
+const brandTarget = computed(() => (auth.isAuthenticated ? '/dashboard' : '/'))
 
 function logout() {
   auth.logout()
@@ -14,7 +17,7 @@ function logout() {
 <template>
   <header class="navbar">
     <div class="container navbar-inner">
-      <router-link to="/dashboard" class="navbar-brand font-display">
+      <router-link :to="brandTarget" class="navbar-brand font-display">
         <span class="navbar-ball"></span>
         PokéVault
       </router-link>
@@ -26,9 +29,16 @@ function logout() {
         <router-link to="/scan" class="navbar-scan">📷 Scannen</router-link>
         <router-link to="/search">Karten suchen</router-link>
         <router-link to="/wishlist">Wunschliste</router-link>
+        <router-link to="/trades">Tausche</router-link>
         <router-link to="/export">Export</router-link>
         <router-link to="/settings">Einstellungen</router-link>
         <button class="btn btn-outline btn-sm" @click="logout">Abmelden</button>
+      </nav>
+
+      <nav v-else class="navbar-links">
+        <router-link to="/faq">FAQ</router-link>
+        <router-link to="/login">Anmelden</router-link>
+        <router-link to="/register" class="btn btn-primary btn-sm">Registrieren</router-link>
       </nav>
     </div>
   </header>
