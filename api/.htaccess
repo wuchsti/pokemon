@@ -11,4 +11,19 @@
     RewriteRule ^lib/ - [F,L]
 </IfModule>
 
+# Many Apache + PHP-CGI/FastCGI setups (mod_fcgid, php-fpm via proxy_fcgi,
+# etc.) strip the Authorization header before PHP ever sees it, so JWT auth
+# ("Authorization: Bearer <token>") silently fails with every authenticated
+# request even though login itself works fine. Explicitly pass it through.
+<IfModule mod_php.c>
+    CGIPassAuth On
+</IfModule>
+<IfModule mod_fcgid.c>
+    CGIPassAuth On
+</IfModule>
+<IfModule mod_rewrite.c>
+    RewriteCond %{HTTP:Authorization} ^(.*)
+    RewriteRule .* - [E=HTTP_AUTHORIZATION:%1]
+</IfModule>
+
 Options -Indexes

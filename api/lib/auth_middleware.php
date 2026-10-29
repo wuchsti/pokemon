@@ -13,8 +13,16 @@ require_once __DIR__ . '/db.php';
  */
 function require_auth_user_id(array $config): int
 {
+    // Some Apache + CGI/FastCGI setups (mod_fcgid, proxy_fcgi, ...) strip the
+    // Authorization header before PHP sees it, or rename it to
+    // REDIRECT_HTTP_AUTHORIZATION when the api/.htaccess rewrite workaround
+    // kicks in. Check every place it might actually show up.
     $headers = function_exists('getallheaders') ? getallheaders() : [];
-    $authHeader = $headers['Authorization'] ?? $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+    $authHeader = $headers['Authorization']
+        ?? $headers['authorization']
+        ?? $_SERVER['HTTP_AUTHORIZATION']
+        ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION']
+        ?? '';
 
     if (!preg_match('/^Bearer\s+(.+)$/i', $authHeader, $matches)) {
         json_error('Nicht authentifiziert.', 401);
