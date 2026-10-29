@@ -65,9 +65,9 @@ onMounted(load)
 
     <PokeballLoader v-if="loading" />
 
-    <p v-else-if="logs.length === 0" class="no-logs">Keine Fehler protokolliert. ✓</p>
+    <p v-else-if="!error && logs.length === 0" class="no-logs">Keine Fehler protokolliert. ✓</p>
 
-    <div v-else class="table-wrap poke-panel">
+    <div v-else-if="!error" class="table-wrap poke-panel">
       <table class="logs-table">
         <thead>
           <tr>

@@ -29,7 +29,19 @@ if ($source !== '') {
 
 $sql .= ' ORDER BY created_at DESC LIMIT 200';
 
-$stmt = $pdo->prepare($sql);
-$stmt->execute($params);
+try {
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    $logs = $stmt->fetchAll();
+} catch (PDOException $e) {
+    // Most likely cause: database/migrations/003_add_error_log.sql hasn't
+    // been run yet on this installation (git-deployed code can get ahead
+    // of the database, since migrations aren't applied automatically).
+    json_error(
+        'Die error_log-Tabelle fehlt. Bitte database/migrations/003_add_error_log.sql '
+        . '(oder die komplette schema.sql, ist idempotent) in der Datenbank einspielen.',
+        500
+    );
+}
 
-json_response(['logs' => $stmt->fetchAll()]);
+json_response(['logs' => $logs]);
