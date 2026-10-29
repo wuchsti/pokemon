@@ -101,15 +101,15 @@ function tcg_api_get(array $config, string $path, array $query = []): array
 /**
  * Cache key for a set's card list. Versioned because the cached shape
  * keeps gaining fields after older rows were already live in production
- * (v2: image_large: v3: price_updated_at) - bumping the key avoids
- * serving stale rows that silently lack a new field. Bump again whenever
- * fetch_set_cards_live()'s returned shape changes. Shared by
- * tcg/set_cards.php and admin/warm_cache.php so both read/write the
- * exact same cache entries.
+ * (v2: image_large; v3: price_updated_at; v4: price_usd/price_usd_updated_at)
+ * - bumping the key avoids serving stale rows that silently lack a new
+ * field. Bump again whenever fetch_set_cards_live()'s returned shape
+ * changes. Shared by tcg/set_cards.php and admin/warm_cache.php so both
+ * read/write the exact same cache entries.
  */
 function set_cards_cache_key(string $setId): string
 {
-    return 'tcg_set_cards_v3_' . $setId;
+    return 'tcg_set_cards_v4_' . $setId;
 }
 
 /**
@@ -148,6 +148,8 @@ function fetch_set_cards_live(array $config, string $setId): array
                 'image_large' => $card['images']['large'] ?? ($card['images']['small'] ?? ''),
                 'price_eur' => extract_cardmarket_price($card),
                 'price_updated_at' => extract_cardmarket_updated_at($card),
+                'price_usd' => extract_tcgplayer_price($card),
+                'price_usd_updated_at' => extract_tcgplayer_updated_at($card),
             ];
         }
 
@@ -206,5 +208,44 @@ function extract_cardmarket_price(array $card): ?float
 function extract_cardmarket_updated_at(array $card): ?string
 {
     $value = $card['cardmarket']['updatedAt'] ?? null;
+    return is_string($value) && $value !== '' ? $value : null;
+}
+
+/**
+ * Extracts the best available TCGplayer USD price (US market) from a
+ * card's API data - a second, independent price source alongside
+ * Cardmarket (EUR), so a nutzer can cross-check if one looks off.
+ * TCGplayer prices are nested per card variant (normal, holofoil, ...),
+ * unlike Cardmarket's flat structure - picks the first variant with
+ * usable data.
+ */
+function extract_tcgplayer_price(array $card): ?float
+{
+    $prices = $card['tcgplayer']['prices'] ?? null;
+    if (!is_array($prices) || $prices === []) {
+        return null;
+    }
+
+    $preferredVariants = ['holofoil', 'reverseHolofoil', 'normal', '1stEditionHolofoil', '1stEditionNormal', 'unlimitedHolofoil', 'unlimited'];
+    $variantKeys = array_unique(array_merge($preferredVariants, array_keys($prices)));
+
+    foreach ($variantKeys as $variantKey) {
+        $variant = $prices[$variantKey] ?? null;
+        if (!is_array($variant)) {
+            continue;
+        }
+        foreach (['market', 'mid', 'low'] as $field) {
+            if (isset($variant[$field]) && is_numeric($variant[$field]) && $variant[$field] > 0) {
+                return round((float) $variant[$field], 2);
+            }
+        }
+    }
+
+    return null;
+}
+
+function extract_tcgplayer_updated_at(array $card): ?string
+{
+    $value = $card['tcgplayer']['updatedAt'] ?? null;
     return is_string($value) && $value !== '' ? $value : null;
 }

@@ -86,6 +86,10 @@ function formatPriceDate(value) {
   return `Stand: ${d}.${m}.${y}`
 }
 
+function formatPriceUsd(value) {
+  return value === null || value === undefined ? null : `$${Number(value).toFixed(2)}`
+}
+
 async function load() {
   loading.value = true
   error.value = ''
@@ -166,6 +170,8 @@ function tilesForSet(setId) {
           kind: 'owned',
           price_eur: oc.price_eur,
           price_updated_at: oc.price_updated_at,
+          price_usd: oc.price_usd,
+          price_usd_updated_at: oc.price_usd_updated_at,
           image_large: oc.image_large,
           ...instance,
         })
@@ -376,6 +382,10 @@ watch(() => props.storageType, load)
                 {{ formatPrice(card.price_eur) }}
                 <span v-if="card.price_updated_at" class="card-tile-price-date">{{ formatPriceDate(card.price_updated_at) }}</span>
               </span>
+              <span v-if="formatPriceUsd(card.price_usd)" class="card-tile-price card-tile-price-alt">
+                {{ formatPriceUsd(card.price_usd) }} (TCGplayer)
+                <span v-if="card.price_usd_updated_at" class="card-tile-price-date">{{ formatPriceDate(card.price_usd_updated_at) }}</span>
+              </span>
               <div class="card-tile-actions">
                 <button class="btn btn-accent btn-sm" @click="openAddModalFromSearch(card)">+ Hinzufügen</button>
                 <button
@@ -449,6 +459,10 @@ watch(() => props.storageType, load)
                 <span class="card-tile-price">
                   {{ formatPrice(tile.price_eur) }}
                   <span v-if="tile.price_updated_at" class="card-tile-price-date">{{ formatPriceDate(tile.price_updated_at) }}</span>
+                </span>
+                <span v-if="formatPriceUsd(tile.price_usd)" class="card-tile-price card-tile-price-alt">
+                  {{ formatPriceUsd(tile.price_usd) }} (TCGplayer)
+                  <span v-if="tile.price_usd_updated_at" class="card-tile-price-date">{{ formatPriceDate(tile.price_usd_updated_at) }}</span>
                 </span>
 
                 <template v-if="tile.kind === 'owned'">
@@ -563,6 +577,12 @@ watch(() => props.storageType, load)
   font-weight: 600;
   font-size: 11px;
   color: var(--poke-gray);
+}
+
+.card-tile-price-alt {
+  font-size: 12px;
+  color: var(--poke-gray);
+  font-weight: 600;
 }
 
 .set-filter-row {
