@@ -42,6 +42,23 @@ async function remove(item) {
   }
 }
 
+const traders = ref(null)
+const loadingTraders = ref(false)
+const tradersError = ref('')
+
+async function searchTraders() {
+  loadingTraders.value = true
+  tradersError.value = ''
+  try {
+    const result = await api.findTraders()
+    traders.value = result.traders
+  } catch (e) {
+    tradersError.value = e.message
+  } finally {
+    loadingTraders.value = false
+  }
+}
+
 onMounted(load)
 </script>
 
@@ -83,6 +100,46 @@ onMounted(load)
         </div>
       </section>
     </div>
+
+    <section v-if="items.length > 0" class="matchmaking poke-panel">
+      <h2 class="font-display panel-title">Tauschpartner finden</h2>
+      <p class="settings-hint">
+        Vergleicht deine Wunschliste mit den öffentlichen Tausch-Bindern anderer
+        PokéVault-Nutzer.
+      </p>
+
+      <button class="btn btn-accent" :disabled="loadingTraders" @click="searchTraders">
+        {{ loadingTraders ? 'Suche läuft...' : '🔍 Tauschpartner suchen' }}
+      </button>
+
+      <div v-if="tradersError" class="error-banner">{{ tradersError }}</div>
+      <PokeballLoader v-if="loadingTraders" />
+
+      <p v-else-if="traders && traders.length === 0" class="no-traders">
+        Noch niemand mit öffentlichem Tausch-Binder hat eine deiner gesuchten Karten.
+      </p>
+
+      <div v-else-if="traders" class="traders-list">
+        <div v-for="trader in traders" :key="trader.username" class="trader-card poke-card">
+          <div class="trader-head">
+            <strong>{{ trader.username }}</strong>
+            <span class="badge badge-trade">{{ trader.matches.length }} Treffer</span>
+          </div>
+          <div class="trader-matches">
+            <img
+              v-for="match in trader.matches"
+              :key="match.card_api_id"
+              :src="match.image_url"
+              :alt="match.card_name"
+              :title="`${match.card_name} (#${match.card_number}, ${match.card_condition})`"
+            />
+          </div>
+          <router-link :to="`/user/${trader.username}/binder`" class="btn btn-outline btn-sm" target="_blank">
+            Tausch-Binder ansehen
+          </router-link>
+        </div>
+      </div>
+    </section>
   </div>
 </template>
 
@@ -134,5 +191,60 @@ onMounted(load)
 
 .wishlist-info span {
   color: var(--poke-gray);
+}
+
+.matchmaking {
+  margin-top: 36px;
+  max-width: 720px;
+}
+
+.panel-title {
+  margin-top: 0;
+  font-size: 18px;
+}
+
+.settings-hint {
+  color: var(--poke-gray);
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.no-traders {
+  margin-top: 14px;
+  font-weight: 600;
+  color: var(--poke-gray);
+}
+
+.traders-list {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.trader-card {
+  padding: 14px;
+  background: var(--poke-white);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.trader-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.trader-matches {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.trader-matches img {
+  width: 48px;
+  border-radius: 6px;
+  border: 2px solid var(--poke-ink);
 }
 </style>

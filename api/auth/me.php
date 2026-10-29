@@ -14,7 +14,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 $userId = require_auth_user_id($config);
 $pdo = get_db($config);
 
-$stmt = $pdo->prepare('SELECT id, username, email, created_at FROM users WHERE id = :id LIMIT 1');
+$stmt = $pdo->prepare('SELECT id, username, email, public_binder_enabled, created_at FROM users WHERE id = :id LIMIT 1');
 $stmt->execute(['id' => $userId]);
 $user = $stmt->fetch();
 

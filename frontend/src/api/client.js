@@ -61,4 +61,28 @@ export const api = {
   removeWishlistItem: (payload) => request('wishlist/remove.php', { method: 'DELETE', body: payload }),
 
   scanCard: (imageDataUri) => request('scan/recognize.php', { method: 'POST', body: { image: imageDataUri } }),
+
+  updateSettings: (payload) => request('auth/settings.php', { method: 'PUT', body: payload }),
+  publicBinder: (username) => request(`public/binder.php?${new URLSearchParams({ username })}`, { auth: false }),
+  findTraders: () => request('matchmaking/find_traders.php'),
+  exportCardsJson: () => request('export/cards.php'),
+
+  async exportCsv() {
+    const token = getToken()
+    const response = await fetch('/api/export/csv.php', {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+    if (!response.ok) {
+      throw new Error('CSV-Export fehlgeschlagen.')
+    }
+    const blob = await response.blob()
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `pokevault-sammlung-${new Date().toISOString().slice(0, 10)}.csv`
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+  },
 }

@@ -3,16 +3,20 @@
 Webanwendung zur Verwaltung, Bewertung und Foto-Erkennung von Pokémon-Sammelkarten.
 Gebaut für ein Netcup Webhosting-Paket (Plesk, PHP 8.x, MariaDB).
 
-Dieses Repository enthält aktuell **Phase 1 (MVP Core & Authentication)**,
-**Phase 2 (Wertermittlung, Preis-Historie & Profil-Dashboard)** und
-**Phase 3 (Foto-Erkennung / Scanning)**:
+Dieses Repository enthält aktuell alle vier funktionalen Phasen:
+**Phase 1 (MVP Core & Authentication)**,
+**Phase 2 (Wertermittlung, Preis-Historie & Profil-Dashboard)**,
+**Phase 3 (Foto-Erkennung / Scanning)** und
+**Phase 4 (Social Features & Export)**:
 Benutzer-Registrierung/Login, Pokémon-TCG-Kartensuche, die Verwaltung der
 eigenen Sammlung (Vault) und des Tausch-Binders inkl. Zustand, Sprache und
 Grading, ein täglicher Cardmarket-Preis-Sync, ein Dashboard mit Gesamtwert
 (getrennt nach Vault/Tauschbinder), Top-5-Schätzen, einem Wertverlaufs-Chart
 und Tagesgewinnern/-verlierern, eine Wunschlisten-Funktion für fehlende
-Karten, sowie ein Kamera-/Foto-Scan-Flow zur schnellen Karten-Erfassung per
-Vision-API. Phase 4 (Social Features & Export) folgt als nächste Ausbaustufe.
+Karten, ein Kamera-/Foto-Scan-Flow zur schnellen Karten-Erfassung per
+Vision-API, ein öffentlicher Tausch-Binder-Link mit Tauschpartner-Matchmaking,
+sowie CSV- und Druck-/PDF-Export. Offen ist nur noch das in der README
+dokumentierte **Backlog** (Startseite, FAQ, Impressum, Datenschutz).
 
 ## Architektur
 
@@ -34,17 +38,22 @@ api/
   config.php         # Zentrale Konfiguration (liest ENV / .env)
   lib/                # jwt.php, db.php, response.php, auth_middleware.php,
                       # tcg_client.php, price_stats.php, vision_client.php
-  auth/               # register.php, login.php, me.php
+  auth/               # register.php, login.php, me.php, settings.php
   cards/              # list.php, add.php, update.php, delete.php (user_cards CRUD)
   tcg/                # search.php, sets.php, set_cards.php (Proxy zu pokemontcg.io)
   stats/              # dashboard.php (Gesamtwert, Top 5, Verlauf, Tagesgewinner/-verlierer)
   wishlist/           # list.php, add.php, remove.php
   scan/               # recognize.php (Vision-API-OCR + Auto-Match)
+  public/             # binder.php (öffentlicher Tausch-Binder, keine Auth)
+  matchmaking/        # find_traders.php (Wunschliste vs. öffentliche Tausch-Binder)
+  export/             # cards.php (JSON), csv.php (CSV-Download)
 database/
   schema.sql          # users, user_cards, price_history, wishlist_items
+  migrations/         # ALTER-Skripte für bereits bestehende Installationen
 frontend/
   src/
-    views/            # Login, Register, Dashboard, Collection, CardSearch, Wishlist, Scan
+    views/            # Login, Register, Dashboard, Collection, CardSearch, Wishlist,
+                      # Scan, Settings, Export, PrintExport, PublicBinder
     components/       # Navbar, PokeballLoader, SetProgress, CardModal, ValueChart, CardScanner
     utils/image.js     # Foto-Resize/Komprimierung (Kamera + Upload) vor dem Hochladen
     stores/auth.js     # Pinia Auth-Store
@@ -82,6 +91,10 @@ Vite proxyt `/api/*`-Requests im Dev-Modus auf `http://localhost:8080`
 1. `cd frontend && npm run build` → Inhalt von `frontend/dist/` in `httpdocs/` kopieren.
 2. Ordner `api/` ebenfalls nach `httpdocs/api/` kopieren.
 3. In Plesk: MariaDB-Datenbank anlegen, `database/schema.sql` importieren.
+   Bei einer **bereits bestehenden** Installation zusätzlich die Dateien in
+   `database/migrations/` in aufsteigender Reihenfolge einspielen (aktuell:
+   `001_add_public_binder_enabled.sql`) - `schema.sql` legt neue Spalten an
+   bestehenden Tabellen nicht nachträglich an.
 4. In Plesk unter "PHP-Einstellungen" bzw. per `.env`-Datei neben `api/config.php`
    die Variablen aus `.env.example` setzen (insbesondere `JWT_SECRET` auf einen
    langen, zufälligen Wert ändern!).
@@ -149,10 +162,31 @@ rotierender Pokéball als Lade-Animation. Siehe `frontend/src/style.css`.
   in `.env` (Standard: OpenAI `gpt-4o-mini`, aber jeder OpenAI-kompatible
   Chat-Completions-Endpunkt mit Bild-Input funktioniert).
 
-## Nächste Schritte (Phase 4)
+## Phase 4 im Detail
 
-- Öffentliche Sammler-Profile, Tausch-Matchmaking (auch unter Einbeziehung der
-  Wunschliste), CSV/PDF-Export.
+- **Öffentlicher Sammler-Link**: Unter `/settings` kann jeder Nutzer seinen
+  Tausch-Binder (nicht den Vault) über einen Schalter öffentlich freigeben
+  (`users.public_binder_enabled`, Opt-in, Standard: aus). Der Link
+  `/user/:username/binder` (`api/public/binder.php`, ohne Login erreichbar)
+  zeigt nur Kartenname, Nummer, Zustand, Sprache und Grading - niemals
+  E-Mail-Adresse, Vault-Inhalt oder Kartenwerte.
+- **Tauschpartner-Matchmaking**: Auf `/wishlist` vergleicht "Tauschpartner
+  finden" (`api/matchmaking/find_traders.php`) die eigene Wunschliste gegen
+  die öffentlichen Tausch-Binder aller Nutzer und zeigt, wer welche gesuchten
+  Karten bereits hat - sortiert nach Trefferzahl, mit direktem Link zum
+  jeweiligen Tausch-Binder. Bewusst nur in diese Richtung (meine Wunschliste
+  vs. deren öffentlicher Binder): die Wunschlisten anderer Nutzer bleiben
+  privat, da dafür kein Opt-in existiert.
+- **Export** (`/export`):
+  - **CSV** (`api/export/csv.php`): komplette Sammlung (Vault + Tausch-Binder)
+    inkl. Preis, Zustand, Sprache und Grading, Semikolon-getrennt für
+    Excel/Sheets, mit UTF-8-BOM für korrekte Umlaute.
+  - **Druckansicht/PDF** (`/export/print`, `PrintExport.vue`): eine bewusst
+    schlichte, dokumentartige Inventarliste (getrennt nach Vault/Tausch-Binder,
+    mit Zwischen- und Gesamtsumme) ohne Navbar, mit eigenem Print-Stylesheet.
+    Es wird keine PHP-PDF-Bibliothek vendort - die Browser-eigene
+    Druckfunktion ("Als PDF speichern") erzeugt das PDF, passend zum
+    Composer-freien Hosting-Ansatz dieses Projekts.
 
 ## Backlog (noch nicht terminiert)
 
@@ -169,8 +203,10 @@ funktionalen Phasen 1–4:
   nicht rein privat/unter Freunden betrieben wird (§5 TMG/DDG). Muss Anbieter-
   Kontaktdaten enthalten.
 - **Datenschutzerklärung**: insbesondere relevant, weil die App Kamera-/
-  Fotodaten (Phase 3) an einen externen Vision-API-Anbieter sendet und
-  Nutzerkonten mit E-Mail-Adressen führt (DSGVO-Informationspflichten).
+  Fotodaten (Phase 3) an einen externen Vision-API-Anbieter sendet,
+  Nutzerkonten mit E-Mail-Adressen führt, und seit Phase 4 Nutzer ihren
+  Tausch-Binder öffentlich zugänglich machen können (Opt-in, aber
+  dokumentationspflichtig) – DSGVO-Informationspflichten.
 
 Wenn es konkret losgehen soll: einfach sagen "bau jetzt die Startseite/FAQ/
 Impressum/Datenschutz" und ich lege los.

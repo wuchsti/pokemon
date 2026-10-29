@@ -36,6 +36,30 @@ const routes = [
     component: () => import('../views/Wishlist.vue'),
     meta: { requiresAuth: true },
   },
+  {
+    path: '/settings',
+    name: 'settings',
+    component: () => import('../views/Settings.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/export',
+    name: 'export',
+    component: () => import('../views/Export.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/export/print',
+    name: 'export-print',
+    component: () => import('../views/PrintExport.vue'),
+    meta: { requiresAuth: true, hideNav: true },
+  },
+  {
+    path: '/user/:username/binder',
+    name: 'public-binder',
+    component: () => import('../views/PublicBinder.vue'),
+    props: true,
+  },
 ]
 
 const router = createRouter({

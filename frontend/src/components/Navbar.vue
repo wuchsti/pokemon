@@ -26,6 +26,8 @@ function logout() {
         <router-link to="/scan" class="navbar-scan">📷 Scannen</router-link>
         <router-link to="/search">Karten suchen</router-link>
         <router-link to="/wishlist">Wunschliste</router-link>
+        <router-link to="/export">Export</router-link>
+        <router-link to="/settings">Einstellungen</router-link>
         <button class="btn btn-outline btn-sm" @click="logout">Abmelden</button>
       </nav>
     </div>
