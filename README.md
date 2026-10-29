@@ -124,6 +124,22 @@ Vite proxyt `/api/*`-Requests im Dev-Modus auf `http://localhost:8080`
    Das Skript fragt für jede in `user_cards` vorhandene Karte den aktuellen
    Cardmarket-Preis ab und schreibt einen Eintrag pro Tag in `price_history`.
    Mehrfaches Ausführen am selben Tag aktualisiert nur den heutigen Eintrag.
+
+   ⚠️ **Netcup-Falle:** Geplante Aufgaben laufen bei Netcup/Plesk-Webhosting
+   oft in einem eigenen Chroot, in dem der obige "offizielle" Pfad
+   (`/var/www/vhosts/...`) **nicht** stimmt und PHP mit
+   `Could not open input file: ...` abbricht, obwohl die Datei da ist. Den
+   echten Pfad findet man, indem man testweise diesen Befehl als Aufgabe
+   anlegt und einmal ausführt:
+   ```bash
+   sh -c "find / -maxdepth 4 -iname httpdocs 2>/dev/null; echo ---ENDE---"
+   ```
+   Die Ausgabe zeigt den tatsächlichen Pfad (bei diesem Hosting-Paket z. B.
+   `/<domain>/httpdocs` statt `/var/www/vhosts/<domain>/httpdocs`). Den
+   Cronjob-Befehl danach entsprechend anpassen, z. B.:
+   ```bash
+   php /<domain>/httpdocs/cron/sync_prices.php
+   ```
 7. **Ersten Admin bestimmen**: Es gibt keinen Einrichtungsassistenten dafür -
    nach der Registrierung des ersten echten Accounts einmalig per SQL:
    ```sql
