@@ -1,0 +1,18 @@
+Dieser Branch "deploy" ist eine automatisch erzeugte Momentaufnahme:
+gebautes Frontend (index.html, assets/, .htaccess) + api/ + cron/ -
+genau das, was 1:1 in httpdocs/ gehoert. Er wird direkt aus dem
+Haupt-Branch (claude/gifted-johnson-qn1gpw) erzeugt; nicht von Hand
+bearbeiten, Aenderungen werden beim naechsten Sync ueberschrieben.
+
+Einmalig einrichten (per SSH):
+  cd httpdocs
+  rm -rf * .htaccess          # nur falls dort schon alte Dateien liegen
+  git clone -b deploy https://github.com/wuchsti/pokemon.git .
+
+Danach bei jedem Update einfach:
+  cd httpdocs
+  git pull
+
+Die .env-Datei (DB-Zugang, JWT_SECRET, API-Keys) ist NICHT Teil dieses
+Branches - die muss einmalig manuell in httpdocs/.env angelegt werden
+und bleibt dort unberuehrt, da git sie nicht kennt.
