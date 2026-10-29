@@ -43,16 +43,7 @@ $data = tcg_cached_fetch(
     // change as a (silently empty) "fresh" cache hit.
     'tcg_sets_all_v2',
     SETS_CACHE_TTL_SECONDS,
-    function () use ($config) {
-        // Explicit pageSize: the upstream API's own default page size is
-        // smaller than the number of sets that exist, which would silently
-        // cut off older sets from the "all collections" browser.
-        $result = tcg_api_request($config, '/sets', ['orderBy' => '-releaseDate', 'pageSize' => 250]);
-        if (!$result['ok']) {
-            return $result;
-        }
-        return ['ok' => true, 'status' => 200, 'data' => ['sets' => $result['data']['data'] ?? []], 'error' => null];
-    },
+    fn () => fetch_all_sets_live($config),
     '/sets'
 );
 

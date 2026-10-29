@@ -36,39 +36,7 @@ $data = tcg_cached_fetch(
     $config,
     'tcg_set_cards_' . $setId,
     SET_CARDS_CACHE_TTL_SECONDS,
-    function () use ($config, $setId) {
-        $cards = [];
-        $page = 1;
-        $pageSize = 250;
-
-        do {
-            $result = tcg_api_request($config, '/cards', [
-                'q' => sprintf('set.id:%s', $setId),
-                'page' => $page,
-                'pageSize' => $pageSize,
-                'orderBy' => 'number',
-            ]);
-
-            if (!$result['ok']) {
-                return $result;
-            }
-
-            $batch = $result['data']['data'] ?? [];
-            foreach ($batch as $card) {
-                $cards[] = [
-                    'id' => $card['id'],
-                    'number' => $card['number'] ?? '',
-                    'name' => $card['name'] ?? '',
-                    'image_small' => $card['images']['small'] ?? '',
-                    'price_eur' => extract_cardmarket_price($card),
-                ];
-            }
-
-            $page++;
-        } while (count($batch) === $pageSize && $page <= 5);
-
-        return ['ok' => true, 'status' => 200, 'data' => ['cards' => $cards], 'error' => null];
-    },
+    fn () => fetch_set_cards_live($config, $setId),
     "/cards?set.id=$setId"
 );
 
