@@ -358,7 +358,10 @@ watch(() => props.storageType, load)
 
     <div class="poke-panel card-search-panel">
       <h3 class="font-display card-search-title">Karte suchen</h3>
-      <p class="card-search-hint">Nach Name oder Kartennummer (z.B. "Prinplup" oder "28/94") - über alle Sammlungen hinweg.</p>
+      <p class="card-search-hint">
+        Nach Name, Kartennummer (z.B. "28/94") oder Set-Kürzel + Nummer wie auf der Karte aufgedruckt
+        (z.B. "SFA 064/188") - über alle Sammlungen hinweg, funktioniert auch bei deutschen Karten.
+      </p>
       <form class="card-search-row" @submit.prevent="searchCards">
         <input v-model="cardQuery" type="text" placeholder="Name oder Nummer..." class="set-search" />
         <button type="submit" class="btn btn-primary btn-sm" :disabled="cardSearchLoading">

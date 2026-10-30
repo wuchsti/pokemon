@@ -6,7 +6,9 @@
 // GET /api/tcg/search.php?setId=xy1&number=12
 
 require_once __DIR__ . '/../lib/response.php';
+require_once __DIR__ . '/../lib/db.php';
 require_once __DIR__ . '/../lib/tcg_client.php';
+require_once __DIR__ . '/../lib/api_cache.php';
 
 $config = require __DIR__ . '/../config.php';
 send_cors_headers($config);
@@ -20,6 +22,23 @@ $setId = trim((string) ($_GET['setId'] ?? ''));
 $number = trim((string) ($_GET['number'] ?? ''));
 $page = max(1, (int) ($_GET['page'] ?? 1));
 $pageSize = min(50, max(1, (int) ($_GET['pageSize'] ?? 20)));
+
+// "SFA 064/188" / "SFA064/188" style input: the printed set abbreviation
+// (ptcgoCode - the same 2-5 letter code stamped bottom-left on the
+// physical card, right next to the collector number) followed by that
+// number. Modern (Scarlet & Violet-era) sets share the exact same
+// set/number structure across English and European-language prints -
+// only the card text is translated - so this also resolves German/
+// French/Italian/Spanish cards correctly, not just English ones.
+if ($query !== '' && $setId === '' && preg_match('/^([A-Za-z]{2,5})[\s\-]*(\d+)(\/\d+)?$/', $query, $m)) {
+    $pdo = get_db($config);
+    $resolvedSetId = resolve_set_id_by_ptcgo_code($pdo, $config, $m[1]);
+    if ($resolvedSetId !== null) {
+        $setId = $resolvedSetId;
+        $number = $m[2];
+        $query = '';
+    }
+}
 
 // A query that's purely digits (optionally "28/94", as printed on the
 // card) is a collector number, not a card name - a name:"*28*" search
@@ -95,4 +114,24 @@ function build_number_filter(string $number): string
     }
 
     return '(' . implode(' OR ', array_map(fn ($v) => "number:$v", $variants)) . ')';
+}
+
+/**
+ * Looks up a set's internal API id by its printed abbreviation
+ * (ptcgoCode), e.g. "SFA" -> the Shrouded Fable set's id. Uses the same
+ * cached set list as tcg/sets.php (no extra API call for the common case).
+ * Returns null if no set with that abbreviation is known.
+ */
+function resolve_set_id_by_ptcgo_code(PDO $pdo, array $config, string $code): ?string
+{
+    $setsData = tcg_cached_fetch($pdo, $config, 'tcg_sets_all_v2', 86400, fn () => fetch_all_sets_live($config), '/sets');
+    $needle = strtoupper($code);
+
+    foreach ($setsData['sets'] ?? [] as $set) {
+        if (isset($set['ptcgoCode']) && strtoupper((string) $set['ptcgoCode']) === $needle) {
+            return $set['id'];
+        }
+    }
+
+    return null;
 }
